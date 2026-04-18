@@ -1,0 +1,116 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // ===============================================================
+    // Assumed Data Model
+    // ===============================================================
+    //
+    // Collection: users
+    // Document ID: {userId}
+    // Fields:
+    //   - monthlyIncome: number (required)
+    //   - currentAge: number (required)
+    //   - retirementAge: number (required)
+    //   - inflationRate: number (optional)
+    //   - expectedReturn: number (optional)
+    //   - accumulationReturn: number (optional)
+    //   - withdrawalRate: number (optional)
+    //   - medicalInflationRate: number (optional)
+    //   - taxSettings: map (optional)
+    //   - lang: string (optional, enum: ['en', 'th'])
+    //   - updatedAt: string (optional, format: date-time)
+    //
+    // Collection: investments
+    // Document ID: {investmentId}
+    // Fields:
+    //   - name: string (required)
+    //   - amount: number (required)
+    //   - category: string (optional)
+    //   - updatedAt: string (optional, format: date-time)
+    //
+    // Collection: milestones
+    // Document ID: {milestoneId}
+    // Fields:
+    //   - name: string (required)
+    //   - year: number (required)
+    //   - amount: number (required)
+    //   - type: string (required, enum: ['expense', 'shock'])
+    //   - updatedAt: string (optional, format: date-time)
+    //
+    // ===============================================================
+
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function isAdmin() {
+      return isAuthenticated() &&
+        (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin' ||
+          (request.auth.token.email == "wlawanpreda@gmail.com" && request.auth.token.email_verified == true));
+    }
+
+    function hasOnlyAllowedFields(fields) {
+      return request.resource.data.keys().hasOnly(fields);
+    }
+
+    function isValidUserProfile(data) {
+      let allowedFields = ['monthlyIncome', 'currentAge', 'retirementAge', 'inflationRate', 'expectedReturn', 'accumulationReturn', 'withdrawalRate', 'medicalInflationRate', 'taxSettings', 'lang', 'updatedAt', 'role'];
+      return data.keys().hasOnly(allowedFields) &&
+             data.keys().hasAll(['monthlyIncome', 'currentAge', 'retirementAge']) &&
+             data.monthlyIncome is number && data.monthlyIncome >= 0 &&
+             data.currentAge is number && data.currentAge >= 0 && data.currentAge < 120 &&
+             data.retirementAge is number && data.retirementAge > 0 && data.retirementAge < 120 &&
+             (!('lang' in data) || data.lang in ['en', 'th']) &&
+             (!('taxSettings' in data) || data.taxSettings is map) &&
+             (!('role' in data) || (data.role == 'user' || isAdmin()));
+    }
+
+    function isValidInvestment(data) {
+      let allowedFields = ['name', 'amount', 'category', 'updatedAt', 'accountNumber', 'gainLossAmount', 'gainLossPercentage', 'expectedReturn'];
+      return data.keys().hasOnly(allowedFields) &&
+             data.keys().hasAll(['name', 'amount']) &&
+             data.name is string && data.name.size() > 0 && data.name.size() < 100 &&
+             data.amount is number &&
+             (!('category' in data) || (data.category is string && data.category.size() < 50));
+    }
+
+    function isValidMilestone(data) {
+      let allowedFields = ['name', 'year', 'amount', 'type', 'updatedAt'];
+      return data.keys().hasOnly(allowedFields) &&
+             data.keys().hasAll(['name', 'year', 'amount', 'type']) &&
+             data.name is string && data.name.size() > 0 && data.name.size() < 100 &&
+             data.year is number && data.year > 1900 && data.year < 2200 &&
+             data.amount is number &&
+             data.type in ['expense', 'shock'];
+    }
+
+    // ===============================================================
+    // Rules
+    // ===============================================================
+
+    match /users/{userId} {
+      allow read: if isOwner(userId) || isAdmin();
+      allow create, update: if (isOwner(userId) || isAdmin()) && isValidUserProfile(request.resource.data);
+      
+      match /investments/{investmentId} {
+        allow read: if isOwner(userId) || isAdmin();
+        allow create, update: if (isOwner(userId) || isAdmin()) && isValidInvestment(request.resource.data);
+        allow delete: if isOwner(userId) || isAdmin();
+      }
+
+      match /milestones/{milestoneId} {
+        allow read: if isOwner(userId) || isAdmin();
+        allow create, update: if (isOwner(userId) || isAdmin()) && isValidMilestone(request.resource.data);
+        allow delete: if isOwner(userId) || isAdmin();
+      }
+    }
+  }
+}

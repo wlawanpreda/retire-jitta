@@ -1,0 +1,76 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "User Profile",
+      "description": "Stores user retirement settings and preferences",
+      "type": "object",
+      "properties": {
+        "monthlyIncome": { "type": "number", "description": "Desired monthly income" },
+        "currentAge": { "type": "number", "description": "User's current age" },
+        "retirementAge": { "type": "number", "description": "Target retirement age" },
+        "inflationRate": { "type": "number", "description": "Expected inflation rate" },
+        "expectedReturn": { "type": "number", "description": "Expected return on growth assets" },
+        "accumulationReturn": { "type": "number", "description": "Expected return during accumulation phase" },
+        "withdrawalRate": { "type": "number", "description": "Target withdrawal rate percentage" },
+        "medicalInflationRate": { "type": "number", "description": "Expected medical inflation rate" },
+        "taxSettings": { "$ref": "TaxSettings" },
+        "lang": { "type": "string", "enum": ["en", "th"], "description": "Preferred language" },
+        "updatedAt": { "type": "string", "format": "date-time", "description": "Last update timestamp" }
+      },
+      "required": ["monthlyIncome", "currentAge", "retirementAge"]
+    },
+    "TaxSettings": {
+      "title": "Tax Settings",
+      "description": "Thai tax optimization settings",
+      "type": "object",
+      "properties": {
+        "taxableIncome": { "type": "number" },
+        "ssfAmount": { "type": "number" },
+        "rmfAmount": { "type": "number" },
+        "reinvestSavings": { "type": "boolean" }
+      }
+    },
+    "Milestone": {
+      "title": "Life Milestone",
+      "description": "A major life event or expense",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "year": { "type": "number" },
+        "amount": { "type": "number" },
+        "type": { "type": "string", "enum": ["expense", "shock"] },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["name", "year", "amount", "type"]
+    },
+    "Investment": {
+      "title": "Investment",
+      "description": "An individual investment or fund entry",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string", "description": "Name of the fund or asset" },
+        "accountNumber": { "type": "string", "description": "Account number or identifier" },
+        "amount": { "type": "number", "description": "Current value of the investment" },
+        "gainLossAmount": { "type": "number", "description": "Profit or loss in currency" },
+        "gainLossPercentage": { "type": "number", "description": "Profit or loss in percentage" },
+        "category": { "type": "string", "description": "Investment category (e.g., Global Equity, Cash)" },
+        "updatedAt": { "type": "string", "format": "date-time", "description": "Last update timestamp" }
+      },
+      "required": ["name", "amount"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "UserProfile",
+      "description": "User specific settings"
+    },
+    "/users/{userId}/investments/{investmentId}": {
+      "schema": "Investment",
+      "description": "User's individual investment holdings"
+    },
+    "/users/{userId}/milestones/{milestoneId}": {
+      "schema": "Milestone",
+      "description": "User's life milestones and stress test events"
+    }
+  }
+}
