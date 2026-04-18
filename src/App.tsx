@@ -10,6 +10,7 @@ import {
   ShieldCheck, 
   AlertTriangle, 
   ArrowRight, 
+  ChevronRight,
   Info,
   PieChart as PieChartIcon,
   Table as TableIcon,
@@ -545,7 +546,7 @@ interface CalculationResult {
   cashBufferAmount: number;
   futureMonthlyIncome: number;
   futurePurchasingPower: number;
-  monthlySavingsRequired: number;
+  requiredMonthlySavings: number;
   scenarios: {
     pessimistic: number;
     base: number;
@@ -829,11 +830,11 @@ const MarketPulse = ({ t, lang }: { t: any, lang: string }) => {
   }, []);
 
   const getFngColor = (value: number) => {
-    if (value < 25) return 'text-rose-600 bg-rose-50';
-    if (value < 45) return 'text-orange-600 bg-orange-50';
-    if (value < 55) return 'text-zinc-600 bg-zinc-50';
-    if (value < 75) return 'text-emerald-600 bg-emerald-50';
-    return 'text-blue-600 bg-blue-50';
+    if (value < 25) return 'bg-rose-500';
+    if (value < 45) return 'bg-orange-500';
+    if (value < 55) return 'bg-zinc-400';
+    if (value < 75) return 'bg-emerald-500';
+    return 'bg-blue-500';
   };
 
   const getFngLabel = (classification: string) => {
@@ -848,89 +849,115 @@ const MarketPulse = ({ t, lang }: { t: any, lang: string }) => {
   };
 
   return (
-    <Card title={t.marketPulse} icon={Zap} className="border-l-4 border-l-blue-500 bg-white/50 backdrop-blur-sm">
-      <div className="space-y-8">
-        <div className="flex flex-col md:flex-row gap-8">
-          {/* Fear & Greed Gauge */}
-          <div className="flex-1">
-            <div className="flex justify-between items-end mb-4">
-              <div className="flex items-center gap-2">
-                <div className="w-2 h-2 rounded-full bg-blue-500 animate-pulse" />
-                <span className="text-[10px] font-bold text-blue-600 uppercase tracking-[0.2em]">{t.fearGreedIndex}</span>
+    <div className="bg-white/40 backdrop-blur-xl border border-white/40 rounded-[2.5rem] p-8 shadow-2xl shadow-orange-900/5 relative overflow-hidden group">
+      <div className="absolute top-0 right-0 p-8 opacity-5">
+        <Zap className="w-48 h-48 text-orange-600" />
+      </div>
+
+      <div className="relative z-10 space-y-8">
+        <div className="flex flex-col lg:flex-row gap-12">
+          {/* Fear & Greed Section */}
+          <div className="flex-1 space-y-6">
+            <div className="flex justify-between items-center">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-orange-600/10 flex items-center justify-center">
+                  <Zap className="w-5 h-5 text-orange-600" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-orange-900 uppercase tracking-widest">{t.marketPulse}</h3>
+                  <p className="text-[10px] font-medium text-orange-600/60 uppercase tracking-widest">{t.fearGreedIndex}</p>
+                </div>
               </div>
-              <span className="text-[8px] text-zinc-400 font-bold uppercase tracking-widest">{t.lastUpdated}: {new Date().toLocaleTimeString()}</span>
+              <div className="text-right">
+                <span className="text-[8px] font-bold text-zinc-300 uppercase tracking-widest block">{t.lastUpdated}</span>
+                <span className="text-[9px] font-bold text-zinc-400 font-mono">{new Date().toLocaleTimeString()}</span>
+              </div>
             </div>
+
             {loading ? (
-              <div className="h-32 flex items-center justify-center bg-zinc-50/50 rounded-3xl border border-zinc-100 animate-pulse">
-                <div className="w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
+              <div className="h-44 flex items-center justify-center bg-zinc-50/50 rounded-3xl border border-zinc-100/50 animate-pulse">
+                <div className="w-8 h-8 border-2 border-orange-600 border-t-transparent rounded-full animate-spin" />
               </div>
             ) : fng ? (
-              <div className="relative pt-6 px-2">
-                <div className="flex justify-between text-[9px] font-bold text-zinc-400 mb-3 uppercase tracking-widest">
-                  <span className="text-rose-500">{t.extremeFear}</span>
-                  <span className="text-zinc-400">{t.neutral}</span>
-                  <span className="text-blue-500">{t.extremeGreed}</span>
-                </div>
-                <div className="h-4 bg-zinc-100 rounded-full overflow-hidden flex p-0.5 shadow-inner">
-                  <div className="h-full bg-rose-500 w-[25%] rounded-l-full" />
-                  <div className="h-full bg-orange-400 w-[20%]" />
-                  <div className="h-full bg-zinc-300 w-[10%]" />
-                  <div className="h-full bg-emerald-400 w-[20%]" />
-                  <div className="h-full bg-blue-500 w-[25%] rounded-r-full" />
-                </div>
-                {/* Needle */}
-                <motion.div 
-                  initial={{ left: '50%' }}
-                  animate={{ left: `${fng.value}%` }}
-                  transition={{ type: "spring", stiffness: 50, damping: 15 }}
-                  className="absolute top-9 w-1.5 h-6 bg-zinc-900 rounded-full shadow-lg z-10"
-                  style={{ transform: 'translateX(-50%)' }}
-                >
-                  <div className="absolute -top-1 left-1/2 -translate-x-1/2 w-3 h-3 bg-zinc-900 rounded-full border-2 border-white shadow-sm" />
-                </motion.div>
-                
-                <div className="mt-8 flex items-center justify-between bg-zinc-50/50 p-4 rounded-2xl border border-zinc-100">
-                  <div className={cn("px-4 py-1.5 rounded-xl text-xs font-bold shadow-sm uppercase tracking-widest", getFngColor(fng.value))}>
-                    {getFngLabel(fng.classification)}
+              <div className="space-y-6">
+                <div className="relative pt-8 px-2">
+                  <div className="flex justify-between text-[9px] font-bold text-zinc-400 mb-4 uppercase tracking-[0.2em] px-1">
+                    <span className="text-rose-500">{t.extremeFear}</span>
+                    <span className="text-zinc-400">{t.neutral}</span>
+                    <span className="text-blue-500">{t.extremeGreed}</span>
                   </div>
-                  <div className="flex items-baseline gap-1">
-                    <span className="text-3xl font-bold font-mono text-zinc-900 tracking-tighter">{fng.value}</span>
-                    <span className="text-[10px] font-bold text-zinc-400 uppercase">Points</span>
+                  <div className="h-3 bg-zinc-100 rounded-full overflow-hidden flex p-0.5 shadow-inner border border-zinc-200/50">
+                    <div className="h-full bg-rose-500 w-[25%] rounded-l-full" />
+                    <div className="h-full bg-orange-400 w-[20%]" />
+                    <div className="h-full bg-zinc-300 w-[10%]" />
+                    <div className="h-full bg-emerald-400 w-[20%]" />
+                    <div className="h-full bg-blue-500 w-[25%] rounded-r-full" />
+                  </div>
+                  {/* Needle - Hardware look */}
+                  <motion.div 
+                    initial={{ left: '50%' }}
+                    animate={{ left: `${fng.value}%` }}
+                    transition={{ type: "spring", stiffness: 40, damping: 12 }}
+                    className="absolute top-11 w-1 h-8 bg-zinc-900 rounded-full shadow-2xl z-10"
+                    style={{ transform: 'translateX(-50%)' }}
+                  >
+                    <div className="absolute -top-1.5 left-1/2 -translate-x-1/2 w-4 h-4 bg-zinc-900 rounded-full border-[3px] border-white shadow-xl" />
+                  </motion.div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="bg-white/50 border border-white p-6 rounded-[2rem] shadow-sm flex flex-col items-center justify-center gap-1 group/score hover:bg-white transition-colors">
+                    <div className={cn("px-4 py-1 rounded-xl text-[10px] font-bold text-white shadow-lg uppercase tracking-widest transition-transform group-hover/score:scale-105", getFngColor(fng.value))}>
+                      {getFngLabel(fng.classification)}
+                    </div>
+                  </div>
+                  <div className="bg-zinc-900 p-6 rounded-[2rem] shadow-xl flex flex-col items-center justify-center gap-1">
+                    <span className="text-4xl font-bold font-mono text-white tracking-tighter">{fng.value}</span>
+                    <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Points</span>
                   </div>
                 </div>
               </div>
             ) : (
-              <div className="h-32 flex items-center justify-center bg-rose-50 rounded-3xl border border-rose-100">
+              <div className="h-44 flex items-center justify-center bg-rose-50 rounded-3xl border border-rose-100">
                 <span className="text-xs font-bold text-rose-400 uppercase tracking-widest">Failed to load index</span>
               </div>
             )}
           </div>
 
-          {/* Economic Indicators */}
-          <div className="flex-1 space-y-4">
-            <span className="text-[10px] font-bold text-blue-600 uppercase tracking-[0.2em] block mb-4">{t.economicIndicators}</span>
-            <div className="grid grid-cols-2 gap-3">
-              <div className="p-4 bg-zinc-50/50 rounded-2xl border border-zinc-100 hover:bg-white hover:shadow-md transition-all">
-                <p className="text-[9px] font-bold text-zinc-400 uppercase tracking-widest mb-1.5">{t.vixIndex}</p>
-                <p className="text-lg font-bold text-zinc-900 font-mono tracking-tighter">14.25 <span className="text-[10px] text-emerald-500">-2.4%</span></p>
+          {/* Economic Indicators Section */}
+          <div className="flex-1 space-y-6">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-2xl bg-blue-600/10 flex items-center justify-center">
+                <TrendingUp className="w-5 h-5 text-blue-600" />
               </div>
-              <div className="p-4 bg-zinc-50/50 rounded-2xl border border-zinc-100 hover:bg-white hover:shadow-md transition-all">
-                <p className="text-[9px] font-bold text-zinc-400 uppercase tracking-widest mb-1.5">{t.sp500}</p>
-                <p className="text-lg font-bold text-zinc-900 font-mono tracking-tighter">5,204.3 <span className="text-[10px] text-emerald-500">+0.8%</span></p>
-              </div>
-              <div className="p-4 bg-zinc-50/50 rounded-2xl border border-zinc-100 hover:bg-white hover:shadow-md transition-all">
-                <p className="text-[9px] font-bold text-zinc-400 uppercase tracking-widest mb-1.5">{t.us10y}</p>
-                <p className="text-lg font-bold text-zinc-900 font-mono tracking-tighter">4.32% <span className="text-[10px] text-rose-500">+1.2%</span></p>
-              </div>
-              <div className="p-4 bg-zinc-50/50 rounded-2xl border border-zinc-100 hover:bg-white hover:shadow-md transition-all">
-                <p className="text-[9px] font-bold text-zinc-400 uppercase tracking-widest mb-1.5">USD/THB</p>
-                <p className="text-lg font-bold text-zinc-900 font-mono tracking-tighter">36.45 <span className="text-[10px] text-zinc-400">0.0%</span></p>
-              </div>
+              <h3 className="text-sm font-bold text-blue-900 uppercase tracking-widest">{t.economicIndicators}</h3>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              {[
+                { label: t.vixIndex, val: '14.25', change: '-2.4%', up: false, neu: false },
+                { label: t.sp500, val: '5,204.3', change: '+0.8%', up: true, neu: false },
+                { label: t.us10y, val: '4.32%', change: '+1.2%', up: true, neu: false },
+                { label: 'USD/THB', val: '36.45', change: '0.0%', up: false, neu: true }
+              ].map((item, idx) => (
+                <div key={idx} className="p-6 bg-white/40 border border-white hover:bg-white hover:shadow-xl hover:shadow-blue-900/5 transition-all rounded-[2rem] group/item">
+                  <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest mb-3 group-hover/item:text-blue-600 transition-colors">{item.label}</p>
+                  <div className="flex flex-col gap-1">
+                    <span className="text-2xl font-bold text-zinc-900 font-mono tracking-tighter leading-none">{item.val}</span>
+                    <span className={cn(
+                      "text-[10px] font-bold font-mono px-2 py-0.5 rounded-lg w-fit mt-2",
+                      item.neu ? "bg-zinc-100 text-zinc-500" : (item.up ? "bg-emerald-100 text-emerald-600" : "bg-rose-100 text-rose-600")
+                    )}>
+                      {item.change}
+                    </span>
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
         </div>
       </div>
-    </Card>
+    </div>
   );
 };
 
@@ -1609,7 +1636,7 @@ export default function App() {
       cashBufferAmount: isNaN(cashBufferAmount) ? 0 : cashBufferAmount,
       futureMonthlyIncome: isNaN(futureMonthlyIncome) ? 0 : futureMonthlyIncome,
       futurePurchasingPower: isNaN(futurePurchasingPower) ? 0 : futurePurchasingPower,
-      monthlySavingsRequired: isNaN(monthlySavingsRequired) ? 0 : monthlySavingsRequired,
+      requiredMonthlySavings: isNaN(monthlySavingsRequired) ? 0 : monthlySavingsRequired,
       scenarios: {
         pessimistic: isNaN(scenarios.pessimistic) ? 0 : scenarios.pessimistic,
         base: isNaN(scenarios.base) ? 0 : scenarios.base,
@@ -2033,7 +2060,7 @@ export default function App() {
                   <div>
                     <p className="text-[10px] font-bold text-orange-600 uppercase tracking-[0.2em] mb-1">{t.monthlySavingsGoal}</p>
                     <p className="text-3xl font-bold font-mono text-orange-900">
-                      {Math.round(results.requiredMonthlySavings).toLocaleString()}
+                      {Math.round(results.requiredMonthlySavings || 0).toLocaleString()}
                       <span className="text-sm font-medium text-orange-400 ml-2">{t.thbMo}</span>
                     </p>
                   </div>
@@ -2053,7 +2080,7 @@ export default function App() {
                       { 
                         icon: TrendingUp, 
                         title: lang === 'th' ? 'เพิ่มการออม' : 'Increase Savings', 
-                        desc: lang === 'th' ? `ออมเพิ่มอีก ${Math.max(0, Math.round(results.requiredMonthlySavings - fixedMonthlySavings)).toLocaleString()} บาท/เดือน` : `Save ${Math.max(0, Math.round(results.requiredMonthlySavings - fixedMonthlySavings)).toLocaleString()} more per month`,
+                        desc: lang === 'th' ? `ออมเพิ่มอีก ${Math.max(0, Math.round((results.requiredMonthlySavings || 0) - (Number(fixedMonthlySavings) || 0))).toLocaleString()} บาท/เดือน` : `Save ${Math.max(0, Math.round((results.requiredMonthlySavings || 0) - (Number(fixedMonthlySavings) || 0))).toLocaleString()} more per month`,
                         color: 'text-orange-600',
                         bg: 'bg-orange-50'
                       },
@@ -2594,47 +2621,64 @@ export default function App() {
             </Card>
 
             {/* Market Insights Section */}
-            <div className="space-y-6">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="w-1.5 h-6 bg-orange-600 rounded-full" />
-                  <h2 className="text-lg font-bold text-orange-900 tracking-tight">{t.marketInsights}</h2>
+            <div className="space-y-12">
+              <div className="flex flex-col md:flex-row justify-between items-end md:items-center gap-4 border-b border-orange-100 pb-8">
+                <div className="flex items-center gap-4">
+                  <div className="w-2 h-8 bg-orange-600 rounded-full" />
+                  <div>
+                    <h2 className="text-3xl font-bold text-orange-950 tracking-tight">{t.marketInsights}</h2>
+                    <p className="text-xs font-semibold text-orange-900/40 uppercase tracking-[0.2em] mt-1">{lang === 'th' ? 'ก้าวทันทุกความเคลื่อนไหว' : 'Stay ahead of the curve'}</p>
+                  </div>
                 </div>
-                <button className="text-[10px] font-bold text-orange-600 uppercase tracking-widest hover:text-orange-700 transition-colors">
-                  {lang === 'th' ? 'ดูทั้งหมด' : 'View All'}
+                <button className="group flex items-center gap-2 px-6 py-3 bg-white border border-orange-100 rounded-2xl shadow-sm hover:border-orange-600 hover:shadow-xl hover:shadow-orange-900/5 transition-all active:scale-95">
+                  <span className="text-[10px] font-bold text-orange-600 uppercase tracking-widest">{lang === 'th' ? 'ดูบทความทั้งหมด' : 'All Articles'}</span>
+                  <ChevronRight className="w-4 h-4 text-orange-600 group-hover:translate-x-1 transition-transform" />
                 </button>
               </div>
               
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                <MarketPulse t={t} lang={lang} />
+              <div className="grid grid-cols-1 xl:grid-cols-3 gap-8">
+                <div className="xl:col-span-2">
+                  <MarketPulse t={t} lang={lang} />
+                </div>
                 
                 <div className="space-y-4">
+                  <div className="flex items-center gap-2 mb-6 ml-2">
+                    <div className="w-1.5 h-1.5 rounded-full bg-orange-600 animate-pulse" />
+                    <span className="text-[10px] font-bold text-orange-950/40 uppercase tracking-widest">{lang === 'th' ? 'บทความล่าสุด' : 'Latest Reads'}</span>
+                  </div>
                   {MARKET_INSIGHTS.map((insight, i) => (
                     <motion.div 
                       key={i}
-                      initial={{ opacity: 0, y: 10 }}
-                      animate={{ opacity: 1, y: 0 }}
+                      initial={{ opacity: 0, x: 20 }}
+                      whileInView={{ opacity: 1, x: 0 }}
+                      viewport={{ once: true }}
                       transition={{ delay: i * 0.1 }}
-                      className="group p-5 bg-white border border-orange-100 rounded-3xl hover:border-orange-300 hover:shadow-xl hover:shadow-orange-500/5 transition-all cursor-pointer relative overflow-hidden"
+                      className="group p-6 bg-white border border-orange-100 rounded-[2rem] hover:border-orange-600 hover:shadow-2xl hover:shadow-orange-900/5 transition-all cursor-pointer relative overflow-hidden"
                       onClick={() => window.open(insight.url, '_blank')}
                     >
-                      <div className="absolute top-0 right-0 p-4 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <ExternalLink className="w-4 h-4 text-orange-400" />
+                      <div className="absolute top-0 right-0 p-6 opacity-0 group-hover:opacity-100 transition-all translate-x-2 group-hover:translate-x-0">
+                        <ArrowUpRight className="w-5 h-5 text-orange-600" />
                       </div>
-                      <div className="flex items-center gap-3 mb-3">
-                        <span className="px-2 py-0.5 bg-orange-50 text-orange-600 text-[8px] font-bold uppercase tracking-widest rounded-md">
-                          {insight.tag}
-                        </span>
-                        <span className="text-[8px] text-zinc-300 font-bold uppercase tracking-widest">
-                          {new Date(insight.date).toLocaleDateString(lang === 'th' ? 'th-TH' : 'en-US', { month: 'short', day: 'numeric' })}
-                        </span>
+                      
+                      <div className="space-y-4">
+                        <div className="flex items-center gap-3">
+                          <span className="px-3 py-1 bg-orange-50 text-orange-600 text-[8px] font-bold uppercase tracking-[0.2em] rounded-lg">
+                            {insight.tag}
+                          </span>
+                          <span className="text-[9px] text-zinc-300 font-bold uppercase tracking-widest">
+                            {new Date(insight.date).toLocaleDateString(lang === 'th' ? 'th-TH' : 'en-US', { month: 'short', day: 'numeric' })}
+                          </span>
+                        </div>
+                        
+                        <div>
+                          <h3 className="text-md font-bold text-orange-950 mb-2 group-hover:text-orange-600 transition-colors line-clamp-2 tracking-tight leading-tight">
+                            {insight.title[lang]}
+                          </h3>
+                          <p className="text-xs text-zinc-400 leading-relaxed line-clamp-2 font-medium">
+                            {insight.description[lang]}
+                          </p>
+                        </div>
                       </div>
-                      <h3 className="text-sm font-bold text-orange-900 mb-2 group-hover:text-orange-600 transition-colors line-clamp-1 tracking-tight">
-                        {insight.title[lang]}
-                      </h3>
-                      <p className="text-xs text-zinc-400 leading-relaxed line-clamp-2 font-medium">
-                        {insight.description[lang]}
-                      </p>
                     </motion.div>
                   ))}
                 </div>
@@ -2902,14 +2946,14 @@ export default function App() {
                     <div className="p-3 bg-blue-50 rounded-xl border border-blue-100">
                       <span className="text-[10px] font-bold text-blue-400 uppercase tracking-widest block mb-1">{t.finalCapital}</span>
                       <p className="text-xl font-bold font-mono text-blue-900">
-                        {Math.round(results.fixedSavingsResult.finalCapital).toLocaleString()}
+                        {Math.round(results.fixedSavingsResult.finalCapital || 0).toLocaleString()}
                         <span className="text-[10px] ml-1 text-blue-400">{t.thb}</span>
                       </p>
                     </div>
                     <div className="p-3 bg-emerald-50 rounded-xl border border-emerald-100">
                       <span className="text-[10px] font-bold text-emerald-400 uppercase tracking-widest block mb-1">{t.potentialMonthlyIncome}</span>
                       <p className="text-xl font-bold font-mono text-emerald-900">
-                        {Math.round(results.fixedSavingsResult.potentialMonthlyIncome).toLocaleString()}
+                        {Math.round(results.fixedSavingsResult.potentialMonthlyIncome || 0).toLocaleString()}
                         <span className="text-[10px] ml-1 text-emerald-400">{t.thb}</span>
                       </p>
                     </div>
