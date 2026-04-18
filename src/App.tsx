@@ -5,50 +5,51 @@
 
 import React, { useState, useMemo, useEffect, Component } from 'react';
 import { 
+  X, 
+  Trash2, 
+  Maximize2, 
+  Save, 
+  Plus, 
+  Info, 
+  Wallet, 
   Calculator, 
-  TrendingUp, 
+  Dices, 
+  ExternalLink, 
+  Zap, 
+  Target, 
+  Calendar, 
   ShieldCheck, 
-  AlertTriangle, 
-  ArrowRight, 
-  ChevronRight,
-  Info,
-  PieChart as PieChartIcon,
-  Table as TableIcon,
-  Zap,
-  ExternalLink,
-  LogOut,
-  LogIn,
-  Plus,
-  Trash2,
-  Save,
-  Wallet,
-  Maximize2,
-  X,
-  Newspaper,
-  Target,
-  Calendar,
-  ListChecks,
-  ArrowUpRight,
-  MessageSquare,
+  TrendingUp, 
+  PieChart as PieChartIcon, 
+  LogOut, 
+  LogIn, 
+  AlertTriangle,
+  Stethoscope,
+  Activity,
   Sparkles,
-  Dices,
-  Send
+  Camera,
+  ChevronRight,
+  ArrowUpRight,
+  Send,
+  ListChecks,
+  MessageSquare,
+  ArrowRight,
+  Table as TableIcon
 } from 'lucide-react';
 import { 
   PieChart, 
   Pie, 
   Cell, 
   ResponsiveContainer, 
-  Tooltip, 
-  Legend,
+  Tooltip as RechartsTooltip, 
+  Legend as RechartsLegend,
   LineChart,
   Line,
   AreaChart,
   Area,
   XAxis,
   YAxis,
-  CartesianGrid,
-  Tooltip as RechartsTooltip
+  CartesianGrid
 } from 'recharts';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from './lib/utils';
@@ -357,7 +358,16 @@ const translations = {
     thaiTaxContext: "Thai Tax Context (SSF/RMF)",
     maxSsfLimit: "SSF Limit (30%, max 200k)",
     maxRmfLimit: "RMF Limit (30%, max 300k)",
-    totalTaxLimit: "Total Limit (SSF+RMF+Others <= 500k)"
+    totalTaxLimit: "Total Limit (SSF+RMF+Others <= 500k)",
+    aiDoctor: "AI Portfolio Doctor",
+    aiDoctorDesc: "Comprehensive analysis of your portfolio health",
+    assetAllocation: "Asset Allocation",
+    allocationPie: "Allocation by Category",
+    analysisResult: "Analysis Result",
+    riskAssessment: "Risk Assessment",
+    recommendations: "Recommendations",
+    analyzePortfolio: "Analyze Portfolio Health",
+    analyzingPortfolio: "AI is reviewing your portfolio..."
   },
   th: {
     title: "ระบบวางแผนเกษียณ 5%",
@@ -849,13 +859,13 @@ const MarketPulse = ({ t, lang }: { t: any, lang: string }) => {
   };
 
   return (
-    <div className="bg-white/40 backdrop-blur-xl border border-white/40 rounded-[2.5rem] p-8 shadow-2xl shadow-orange-900/5 relative overflow-hidden group">
+    <div className="bg-white/40 backdrop-blur-xl border border-white/40 rounded-[2.5rem] p-5 sm:p-8 shadow-2xl shadow-orange-900/5 relative overflow-hidden group">
       <div className="absolute top-0 right-0 p-8 opacity-5">
         <Zap className="w-48 h-48 text-orange-600" />
       </div>
 
       <div className="relative z-10 space-y-8">
-        <div className="flex flex-col lg:flex-row gap-12">
+        <div className="flex flex-col md:flex-row gap-12">
           {/* Fear & Greed Section */}
           <div className="flex-1 space-y-6">
             <div className="flex justify-between items-center">
@@ -963,6 +973,156 @@ const MarketPulse = ({ t, lang }: { t: any, lang: string }) => {
 
 // --- Components ---
 
+// --- Components ---
+
+const AssetAllocationChart = ({ investments, t }: { investments: Investment[], t: any }) => {
+  const data = useMemo(() => {
+    const categories: Record<string, number> = {};
+    investments.forEach(inv => {
+      const cat = inv.category || 'Global Equity';
+      categories[cat] = (categories[cat] || 0) + inv.amount;
+    });
+    
+    return Object.entries(categories).map(([name, value]) => ({ 
+      name: name === 'Global Equity' ? t.growthEngine : t.safetyNet, 
+      value 
+    }));
+  }, [investments, t]);
+
+  const COLORS = ['#ea580c', '#3b82f6', '#10b981', '#f59e0b'];
+
+  return (
+    <Card className="h-full border-zinc-100 shadow-md">
+       <div className="flex items-center gap-3 mb-6">
+        <div className="w-10 h-10 rounded-2xl bg-emerald-600/10 flex items-center justify-center">
+          <PieChartIcon className="w-5 h-5 text-emerald-600" />
+        </div>
+        <div>
+          <h3 className="text-sm font-bold text-zinc-900 uppercase tracking-widest">{t.assetAllocation}</h3>
+          <p className="text-[10px] font-medium text-zinc-400 uppercase tracking-widest">{t.allocationPie}</p>
+        </div>
+      </div>
+      <div className="h-[250px] w-full">
+        <ResponsiveContainer width="100%" height="100%">
+          <PieChart>
+            <Pie
+              data={data}
+              cx="50%"
+              cy="50%"
+              innerRadius={60}
+              outerRadius={80}
+              paddingAngle={5}
+              dataKey="value"
+            >
+              {data.map((entry, index) => (
+                <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} stroke="none" />
+              ))}
+            </Pie>
+            <RechartsTooltip 
+              contentStyle={{ borderRadius: '20px', border: 'none', boxShadow: '0 25px 50px -12px rgb(0 0 0 / 0.25)', padding: '12px 16px' }}
+              itemStyle={{ fontWeight: 700, fontSize: '12px' }}
+            />
+            <RechartsLegend verticalAlign="bottom" height={36}/>
+          </PieChart>
+        </ResponsiveContainer>
+      </div>
+    </Card>
+  );
+};
+
+const AIPortfolioDoctor = ({ investments, age, t, lang }: { investments: Investment[], age: number, t: any, lang: string }) => {
+  const [analysis, setAnalysis] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+
+  const analyze = async () => {
+    setIsLoading(true);
+    try {
+      const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || '' });
+      
+      const portfolioText = investments.map(inv => `${inv.name}: ${inv.amount} THB (${inv.category})`).join('\n');
+      const prompt = `
+        You are "AI Portfolio Doctor", an expert financial advisor specializing in Thai retirement planning and the Jitta Wealth 5% rule.
+        Analyze this portfolio for a person aged ${age}:
+        
+        Portfolio Data:
+        ${portfolioText}
+        
+        Provide analysis in ${lang === 'th' ? 'Thai' : 'English'} including:
+        1. Risk Assessment (Low/Medium/High)
+        2. Diversification analysis
+        3. Recommendation for age ${age}
+        4. Strategy alignment with the 5% rule.
+        
+        Keep it concise, professional, and encouraging. Focus on "Sustainability First".
+      `;
+
+      const response = await ai.models.generateContent({
+        model: "gemini-3-flash-preview",
+        contents: prompt,
+      });
+      
+      setAnalysis(response.text || "No analysis generated.");
+    } catch (error) {
+      console.error("AI Analysis failed", error);
+      setAnalysis("Failed to generate analysis. Please ensure you have a valid Internet connection.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  return (
+    <Card className="relative overflow-hidden group border-zinc-100 shadow-md">
+      <div className="absolute top-0 right-0 p-8 opacity-5">
+        <Activity className="w-48 h-48 text-rose-600" />
+      </div>
+      
+      <div className="relative z-10 space-y-6">
+        <div className="flex justify-between items-start">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-2xl bg-rose-600/10 flex items-center justify-center">
+              <Stethoscope className="w-5 h-5 text-rose-600" />
+            </div>
+            <div>
+              <h3 className="text-sm font-bold text-zinc-900 uppercase tracking-widest">{t.aiDoctor}</h3>
+              <p className="text-[10px] font-medium text-zinc-400 uppercase tracking-widest">{t.aiDoctorDesc}</p>
+            </div>
+          </div>
+          <button
+            onClick={analyze}
+            disabled={isLoading || investments.length === 0}
+            className={cn(
+              "px-6 py-2 bg-rose-600 text-white rounded-2xl text-xs font-bold shadow-lg shadow-rose-200 transition-all active:scale-95 disabled:opacity-50",
+              isLoading && "animate-pulse"
+            )}
+          >
+            {isLoading ? t.analyzingPortfolio : t.analyzePortfolio}
+          </button>
+        </div>
+
+        {analysis ? (
+          <motion.div 
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="p-6 bg-rose-50/50 rounded-3xl border border-rose-100/50 space-y-4"
+          >
+            <div className="flex items-center gap-2 mb-2">
+              <Sparkles className="w-4 h-4 text-rose-500" />
+              <span className="text-xs font-bold text-rose-900 uppercase tracking-tight">{t.analysisResult}</span>
+            </div>
+            <div className="text-sm text-zinc-700 leading-relaxed whitespace-pre-wrap font-medium">
+              {analysis}
+            </div>
+          </motion.div>
+        ) : (
+          <div className="h-24 flex items-center justify-center border-2 border-dashed border-zinc-100 rounded-3xl">
+             <span className="text-xs font-bold text-zinc-300 uppercase tracking-widest">Ready to analyze your portfolio</span>
+          </div>
+        )}
+      </div>
+    </Card>
+  );
+};
+
 interface ErrorBoundaryProps {
   children: React.ReactNode;
 }
@@ -1024,7 +1184,7 @@ class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
 }
 
 const Card = ({ children, className, title, icon: Icon, ...props }: { children: React.ReactNode, className?: string, title?: string, icon?: any, [key: string]: any }) => (
-  <div className={cn("bg-white border border-orange-100 rounded-2xl p-6 shadow-sm", className)} {...props}>
+  <div className={cn("bg-white border border-orange-100 rounded-2xl p-5 sm:p-6 shadow-sm", className)} {...props}>
     {title && (
       <div className="flex items-center gap-2 mb-4">
         {Icon && <Icon className="w-5 h-5 text-orange-400" />}
@@ -1897,7 +2057,7 @@ export default function App() {
         </div>
       </header>
 
-      <main className="max-w-7xl mx-auto px-6 py-10">
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 py-10">
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
           
           {/* Left Column: Inputs */}
@@ -2033,7 +2193,7 @@ export default function App() {
                     {t.returnRangeInfo}
                   </p>
                   
-                  <div className="grid grid-cols-3 gap-2">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                     <div className="p-2 bg-rose-50 border border-rose-100 rounded-lg text-center">
                       <span className="text-[9px] font-bold text-rose-400 uppercase block mb-1">{t.pessimistic}</span>
                       <span className="text-xs font-bold font-mono text-rose-600">{Math.round(results.scenarios.pessimistic).toLocaleString()}</span>
@@ -2134,13 +2294,13 @@ export default function App() {
               )}
               
               {/* Goal Progress Card */}
-              <Card className="col-span-full bg-gradient-to-br from-orange-600 to-orange-700 text-white border-none shadow-2xl shadow-orange-200/50 overflow-hidden relative min-h-[200px] flex items-center">
+              <Card className="col-span-full bg-gradient-to-br from-orange-600 to-orange-700 text-white border-none shadow-2xl shadow-orange-200/50 overflow-hidden relative min-h-[auto] md:min-h-[220px] flex items-center p-8 sm:p-10">
                 <div className="absolute top-0 right-0 p-8 opacity-10 pointer-events-none">
-                  <Target className="w-48 h-48" />
+                  <Target className="w-48 h-48 sm:w-64 sm:h-64" />
                 </div>
-                <div className="relative z-10 w-full px-4">
-                  <div className="flex flex-col md:flex-row justify-between items-center gap-8">
-                    <div className="flex-1 w-full">
+                <div className="relative z-10 w-full">
+                  <div className="flex flex-col lg:flex-row justify-between items-center gap-10">
+                    <div className="flex-1 w-full space-y-8">
                       <div className="flex items-center gap-3 mb-6">
                         <div className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center backdrop-blur-md">
                           <Target className="w-5 h-5 text-white" />
@@ -2159,13 +2319,21 @@ export default function App() {
                             </span>
                             <span className="text-orange-200 text-sm font-bold uppercase tracking-widest">Progress</span>
                           </div>
-                          <div className="text-right">
-                            <p className="text-xs font-bold text-orange-100 uppercase tracking-wider mb-1">Current / Target</p>
-                            <p className="text-sm font-bold font-mono">
-                              {Math.round(currentSavings).toLocaleString()} <span className="text-orange-300">/</span> {Math.round(results.targetCapital).toLocaleString()} <span className="text-[10px] text-orange-300">{t.thb}</span>
-                            </p>
-                          </div>
-                        </div>
+                    <div className="text-right hidden sm:block">
+                      <p className="text-xs font-bold text-orange-100 uppercase tracking-wider mb-1">Current / Target</p>
+                      <p className="text-sm font-bold font-mono">
+                        {Math.round(currentSavings).toLocaleString()} <span className="text-orange-300">/</span> {Math.round(results.targetCapital).toLocaleString()} <span className="text-[10px] text-orange-300">{t.thb}</span>
+                      </p>
+                    </div>
+                  </div>
+                  
+                  {/* Progress Stats for Mobile */}
+                  <div className="sm:hidden mt-2 text-left">
+                    <p className="text-[10px] font-bold text-orange-100 uppercase tracking-wider mb-1">Current / Target</p>
+                    <p className="text-xs font-bold font-mono">
+                      {Math.round(currentSavings).toLocaleString()} <span className="text-orange-300">/</span> {Math.round(results.targetCapital).toLocaleString()} <span className="text-[8px] text-orange-300">{t.thb}</span>
+                    </p>
+                  </div>
                         
                         <div className="relative">
                           <div className="h-4 bg-white/10 rounded-full overflow-hidden backdrop-blur-sm border border-white/5">
@@ -2187,9 +2355,9 @@ export default function App() {
                       </div>
                     </div>
                     
-                    <div className="w-full md:w-px h-px md:h-32 bg-white/10" />
+                    <div className="w-full lg:w-px h-px lg:h-40 bg-white/20" />
                     
-                    <div className="flex-1 w-full">
+                    <div className="flex-1 w-full space-y-8">
                       <div className="flex items-center gap-3 mb-6">
                         <div className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center backdrop-blur-md">
                           <Calendar className="w-5 h-5 text-white" />
@@ -2242,10 +2410,10 @@ export default function App() {
                     <div>
                       <p className="text-[10px] font-bold text-emerald-600 uppercase tracking-[0.2em] mb-2">{t.healthScoreDesc}</p>
                       <div className="flex items-baseline gap-2">
-                        <span className="text-6xl font-bold font-mono tracking-tighter" style={{ color: results.healthScore.color }}>
+                        <span className="text-4xl sm:text-6xl font-bold font-mono tracking-tighter" style={{ color: results.healthScore.color }}>
                           {results.healthScore.total}
                         </span>
-                        <span className="text-lg font-bold text-emerald-200 font-mono">/ 100</span>
+                        <span className="text-sm sm:text-lg font-bold text-emerald-200 font-mono">/ 100</span>
                       </div>
                     </div>
                     <motion.div 
@@ -2620,6 +2788,24 @@ export default function App() {
               </div>
             </Card>
 
+            {/* AI Advanced Analytics & Portfolio Doctor */}
+            <section className="space-y-12">
+              <div className="flex flex-col md:flex-row justify-between items-end md:items-center gap-4 border-b border-rose-100 pb-8">
+                <div className="flex items-center gap-4">
+                  <div className="w-2 h-8 bg-rose-600 rounded-full" />
+                  <div>
+                    <h2 className="text-3xl font-bold text-rose-950 tracking-tight">{t.detailedAnalysis}</h2>
+                    <p className="text-xs font-semibold text-rose-900/40 uppercase tracking-[0.2em] mt-1">{lang === 'th' ? 'วิเคราะห์เชิงลึกด้วย AI' : 'AI Powered Insights'}</p>
+                  </div>
+                </div>
+              </div>
+              
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                <AIPortfolioDoctor investments={investments} age={currentAge} t={t} lang={lang} />
+                <AssetAllocationChart investments={investments} t={t} />
+              </div>
+            </section>
+
             {/* Market Insights Section */}
             <div className="space-y-12">
               <div className="flex flex-col md:flex-row justify-between items-end md:items-center gap-4 border-b border-orange-100 pb-8">
@@ -2636,8 +2822,8 @@ export default function App() {
                 </button>
               </div>
               
-              <div className="grid grid-cols-1 xl:grid-cols-3 gap-8">
-                <div className="xl:col-span-2">
+              <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-8">
+                <div className="lg:col-span-2">
                   <MarketPulse t={t} lang={lang} />
                 </div>
                 
@@ -2689,15 +2875,15 @@ export default function App() {
             {user && (
               <Card title={t.portfolio} icon={Wallet} className="border-l-4 border-l-emerald-500">
                 <div className="space-y-6">
-                  <div className="flex flex-col md:flex-row justify-between items-start md:items-center bg-emerald-50/50 p-6 rounded-2xl border border-emerald-100 gap-6">
-                    <div>
+                  <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center bg-emerald-50/50 p-6 rounded-2xl border border-emerald-100 gap-6">
+                    <div className="w-full sm:w-auto">
                       <p className="text-[10px] font-bold text-emerald-600 uppercase tracking-widest mb-1">{t.totalPortfolio}</p>
                       <p className="text-3xl font-bold font-mono text-emerald-900">
                         {Math.round(currentSavings).toLocaleString()} 
                         <span className="text-sm font-medium text-emerald-400 ml-2">{t.thb}</span>
                       </p>
                     </div>
-                    <div className="flex gap-3 w-full md:w-auto">
+                    <div className="flex flex-col xs:flex-row gap-3 w-full sm:w-auto">
                       <input 
                         type="file" 
                         ref={fileInputRef} 
@@ -2785,8 +2971,8 @@ export default function App() {
                               </div>
                             </div>
                             
-                            <div className="flex items-end justify-between gap-6 pl-2">
-                              <div className="flex-1">
+                            <div className="flex flex-col sm:flex-row items-start sm:items-end justify-between gap-6 pl-2">
+                              <div className="w-full sm:flex-1">
                                 <p className="text-[10px] font-bold text-orange-300 uppercase tracking-[0.2em] mb-2">{t.amount}</p>
                                 <div className="relative group/input">
                                   <input 
@@ -2800,7 +2986,7 @@ export default function App() {
                               </div>
                               
                               {/* Mini History Chart */}
-                              <div className="w-32 h-16 flex flex-col justify-end shrink-0 bg-orange-50/30 rounded-xl p-2 border border-orange-100/50">
+                              <div className="w-full sm:w-32 h-16 flex flex-col justify-end shrink-0 bg-orange-50/30 rounded-xl p-2 border border-orange-100/50">
                                 <div className="h-10 relative">
                                   {inv.history && inv.history.length > 1 ? (
                                     <ResponsiveContainer width="100%" height="100%">
@@ -2885,11 +3071,11 @@ export default function App() {
                           <Cell key={`cell-${index}`} fill={entry.color} />
                         ))}
                       </Pie>
-                      <Tooltip 
+                      <RechartsTooltip 
                         contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }}
                         formatter={(value: number) => `${Math.round(value).toLocaleString()} ${t.thb}`}
                       />
-                      <Legend verticalAlign="bottom" height={36}/>
+                      <RechartsLegend verticalAlign="bottom" height={36}/>
                     </PieChart>
                   </ResponsiveContainer>
                 </div>
@@ -3104,44 +3290,6 @@ export default function App() {
               </p>
             </Card>
 
-            {/* Suggested Features */}
-            <Card title={t.suggestedFeatures} icon={Zap} className="bg-emerald-50 border-emerald-100">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="p-3 bg-white rounded-xl border border-emerald-100 shadow-sm">
-                  <div className="flex items-center gap-2 mb-2">
-                    <div className="w-6 h-6 rounded-full bg-emerald-100 flex items-center justify-center">
-                      <TrendingUp className="w-3.5 h-3.5 text-emerald-600" />
-                    </div>
-                    <span className="text-xs font-bold text-emerald-900">{t.dividendTracking}</span>
-                  </div>
-                  <p className="text-[10px] text-emerald-600 leading-relaxed">
-                    {lang === 'th' ? 'ติดตามรายได้จากปันผลแยกตามกองทุน เพื่อดู Cash Flow จริงที่เกิดขึ้น' : 'Track dividend income per fund to see actual cash flow generated.'}
-                  </p>
-                </div>
-                <div className="p-3 bg-white rounded-xl border border-emerald-100 shadow-sm">
-                  <div className="flex items-center gap-2 mb-2">
-                    <div className="w-6 h-6 rounded-full bg-emerald-100 flex items-center justify-center">
-                      <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
-                    </div>
-                    <span className="text-xs font-bold text-emerald-900">{t.rebalancingAlerts}</span>
-                  </div>
-                  <p className="text-[10px] text-emerald-600 leading-relaxed">
-                    {lang === 'th' ? 'แจ้งเตือนเมื่อสัดส่วนพอร์ตเบี่ยงเบนจาก 80/20 เพื่อช่วยให้คุณตัดสินใจปรับพอร์ตได้แม่นยำ' : 'Alert when portfolio deviates from 80/20 target to help you rebalance accurately.'}
-                  </p>
-                </div>
-                <div className="p-3 bg-white rounded-xl border border-emerald-100 shadow-sm">
-                  <div className="flex items-center gap-2 mb-2">
-                    <div className="w-6 h-6 rounded-full bg-emerald-100 flex items-center justify-center">
-                      <PieChartIcon className="w-3.5 h-3.5 text-emerald-600" />
-                    </div>
-                    <span className="text-xs font-bold text-emerald-900">{t.goalProgress}</span>
-                  </div>
-                  <p className="text-[10px] text-emerald-600 leading-relaxed">
-                    {lang === 'th' ? 'แสดงความคืบหน้าเทียบกับเงินต้นเป้าหมาย พร้อมพยากรณ์วันที่คุณจะเกษียณได้จริง' : 'Show progress against target capital and forecast your actual retirement date.'}
-                  </p>
-                </div>
-              </div>
-            </Card>
 
             {/* Stress Test */}
             <Card title={t.stressTest} icon={Zap} className="bg-amber-50 border-amber-100">
