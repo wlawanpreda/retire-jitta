@@ -324,7 +324,13 @@ const translations = {
     finalCapital: "Final Capital at Retirement",
     savingsDrivenProjection: "Savings-Driven Projection",
     potentialIncomeDesc: "Estimated monthly income you can withdraw sustainably (5% rule)",
-    expectedReturnShort: "Exp. Return",
+    expectedReturnShort: "Exp. Growth",
+    actualReturnShort: "Actual Return",
+    actualReturnAnnualized: "Yearly Return",
+    forMonths: "for {n} mo",
+    month: "Mo",
+    perYear: "/ YR",
+    sinceInception: "Since Inception",
     healthScore: "Retirement Health Score",
     healthScoreDesc: "Overall strength of your retirement plan",
     progressScore: "Capital Progress",
@@ -512,6 +518,12 @@ const translations = {
     savingsDrivenProjection: "ประมาณการตามยอดเงินออม",
     potentialIncomeDesc: "รายได้ต่อเดือนที่คุณสามารถถอนมาใช้ได้อย่างยั่งยืน (กฎ 5%)",
     expectedReturnShort: "ผลตอบแทนคาดหวัง",
+    actualReturnShort: "ผลตอบแทนจริง",
+    actualReturnAnnualized: "ผลตอบแทน (ต่อปี)",
+    forMonths: "รวม {n} เดือน",
+    month: "ด.",
+    perYear: "/ ปี",
+    sinceInception: "ตั้งแต่เริ่มต้น",
     healthScore: "คะแนนสุขภาพแผนเกษียณ",
     healthScoreDesc: "ความแข็งแรงโดยรวมของแผนการเกษียณของคุณ",
     progressScore: "ความคืบหน้าเงินต้น",
@@ -632,6 +644,26 @@ const DetailedInvestmentModal = ({
     });
   }, [investment.history]);
 
+  const performanceSummary = useMemo(() => {
+    if (!investment.history || investment.history.length < 2) return null;
+    const first = investment.history[0];
+    const latest = investment.history[investment.history.length - 1];
+    if (first.amount === 0) return { total: 0, annualized: 0, isAnnualized: false, months: 0 };
+    
+    const total = ((latest.amount - first.amount) / first.amount) * 100;
+    const diffInDays = Math.max(1, (new Date(latest.date).getTime() - new Date(first.date).getTime()) / (1000 * 60 * 60 * 24));
+    const diffInYears = diffInDays / 365.25;
+    const diffInMonths = Math.ceil(diffInDays / 30.44);
+    
+    const isAnnualized = diffInYears >= 0.95; // Close enough to a year
+    let annualized = total;
+    if (isAnnualized) {
+      annualized = (Math.pow(latest.amount / first.amount, 1 / diffInYears) - 1) * 100;
+    }
+    
+    return { total, annualized, isAnnualized, months: diffInMonths };
+  }, [investment.history]);
+
   return (
     <motion.div 
       initial={{ opacity: 0 }}
@@ -676,18 +708,27 @@ const DetailedInvestmentModal = ({
               </p>
             </div>
             <div className="p-6 bg-emerald-50/50 rounded-3xl border border-emerald-100/50">
-              <p className="text-[10px] font-bold text-emerald-400 uppercase tracking-widest mb-2">{t.performance}</p>
-              <div className="flex items-baseline gap-2">
-                <p className={cn(
-                  "text-3xl font-bold font-mono",
-                  (historyData[historyData.length - 1]?.gainLossPct || 0) >= 0 ? "text-emerald-600" : "text-rose-600"
-                )}>
-                  {historyData.length > 0 ? (historyData[historyData.length - 1].gainLossPct >= 0 ? '+' : '') : ''}
-                  {historyData.length > 0 ? historyData[historyData.length - 1].gainLossPct : 0}%
-                </p>
-                <span className="text-xs font-bold text-emerald-400 uppercase tracking-tighter">
-                  {t.sinceStart}
-                </span>
+              <p className="text-[10px] font-bold text-emerald-400 uppercase tracking-widest mb-2">
+                {performanceSummary?.isAnnualized ? t.actualReturnAnnualized : t.actualReturnShort}
+              </p>
+              <div className="flex flex-col">
+                <div className="flex items-baseline gap-2">
+                  <p className={cn(
+                    "text-3xl font-bold font-mono",
+                    (performanceSummary?.isAnnualized ? performanceSummary.annualized : (performanceSummary?.total || 0)) >= 0 ? "text-emerald-600" : "text-rose-600"
+                  )}>
+                    {performanceSummary ? ((performanceSummary.isAnnualized ? performanceSummary.annualized : performanceSummary.total) >= 0 ? '+' : '') : ''}
+                    {performanceSummary ? (performanceSummary.isAnnualized ? performanceSummary.annualized : performanceSummary.total).toFixed(2) : '0.00'}%
+                  </p>
+                  <span className="text-[10px] font-bold text-emerald-400 uppercase tracking-tighter">
+                    {performanceSummary?.isAnnualized ? t.perYear : (performanceSummary ? (t.forMonths || 'set {n} mo').replace('{n}', performanceSummary.months.toString()) : '')}
+                  </span>
+                </div>
+                {performanceSummary?.isAnnualized && (
+                  <p className="text-[10px] font-medium text-emerald-500/60 mt-1 uppercase tracking-wider">
+                    {performanceSummary.total >= 0 ? '+' : ''}{performanceSummary.total.toFixed(2)}% {t.sinceInception}
+                  </p>
+                )}
               </div>
             </div>
             <div className="p-6 bg-orange-600 rounded-3xl shadow-lg shadow-orange-200">
@@ -1119,6 +1160,26 @@ const InvestmentCard = ({
     setLocalReturn(inv.expectedReturn ?? accumulationReturn);
   }, [inv.expectedReturn, accumulationReturn]);
 
+  const performance = useMemo(() => {
+    if (!inv.history || inv.history.length < 2) return null;
+    const first = inv.history[0];
+    const latest = inv.history[inv.history.length - 1];
+    if (first.amount === 0) return { total: 0, annualized: 0, isAnnualized: false, months: 0 };
+    
+    const total = ((latest.amount - first.amount) / first.amount) * 100;
+    const diffInDays = Math.max(1, (new Date(latest.date).getTime() - new Date(first.date).getTime()) / (1000 * 60 * 60 * 24));
+    const diffInYears = diffInDays / 365.25;
+    const diffInMonths = Math.ceil(diffInDays / 30.44);
+    
+    const isAnnualized = diffInYears >= 0.95;
+    let annualized = total;
+    if (isAnnualized) {
+      annualized = (Math.pow(latest.amount / first.amount, 1 / diffInYears) - 1) * 100;
+    }
+    
+    return { total, annualized, isAnnualized, months: diffInMonths };
+  }, [inv.history]);
+
   const handleRecord = async () => {
     setIsRecording(true);
     await recordInvestmentHistory(inv.id, inv.amount);
@@ -1238,9 +1299,9 @@ const InvestmentCard = ({
           </button>
         </div>
 
-        <div className="grid grid-cols-2 gap-3 pt-2 pl-2">
-          <div className="space-y-1.5">
-            <p className="text-[9px] font-bold text-orange-300 uppercase tracking-widest">Category</p>
+        <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 pt-2 pl-2">
+          <div className="space-y-1.5 lg:col-span-1 col-span-2">
+            <p className="text-[9px] font-bold text-orange-300 uppercase tracking-widest">{t.category}</p>
             <select 
               className="w-full text-[10px] font-bold text-orange-600 bg-orange-50/50 border border-orange-100/50 rounded-xl px-3 py-2 focus:ring-2 focus:ring-orange-500/10 cursor-pointer hover:bg-orange-100/50 transition-all outline-none"
               value={inv.category}
@@ -1262,6 +1323,28 @@ const InvestmentCard = ({
                 placeholder={t.expectedReturnShort}
               />
               <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] text-emerald-400 font-bold">%</span>
+            </div>
+          </div>
+          <div className="space-y-1.5">
+            <p className="text-[9px] font-bold text-orange-400 uppercase tracking-widest">
+              {performance?.isAnnualized ? t.actualReturnAnnualized : t.actualReturnShort}
+            </p>
+            <div className={cn(
+              "w-full text-[11px] font-mono font-bold border rounded-xl px-3 py-2 flex items-center justify-between",
+              !performance ? "bg-orange-50/20 border-orange-100/30 text-orange-300" :
+              (performance.isAnnualized ? performance.annualized : performance.total) >= 0 ? "bg-emerald-50/30 border-emerald-100/30 text-emerald-600" : "bg-rose-50/30 border-rose-100/30 text-rose-600"
+            )}>
+              <div className="flex flex-col">
+                <span>
+                  {performance ? `${(performance.isAnnualized ? performance.annualized : performance.total) > 0 ? '+' : ''}${(performance.isAnnualized ? performance.annualized : performance.total).toFixed(1)}%` : '-%'}
+                </span>
+                {!performance?.isAnnualized && performance && (
+                  <span className="text-[8px] opacity-60 font-sans tracking-tight leading-none mt-0.5">
+                    {(t.forMonths || 'for {n} mo').replace('{n}', performance.months.toString())}
+                  </span>
+                )}
+              </div>
+              {performance && ((performance.isAnnualized ? performance.annualized : performance.total) >= 0 ? <TrendingUp className="w-3 h-3" /> : <AlertTriangle className="w-3 h-3" />)}
             </div>
           </div>
         </div>
