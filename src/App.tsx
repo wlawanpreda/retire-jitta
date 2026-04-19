@@ -1636,6 +1636,12 @@ export default function App() {
     reinvestSavings: true
   });
   const [milestones, setMilestones] = useState<Milestone[]>([]);
+  const [milestoneDraft, setMilestoneDraft] = useState<{
+    name: string;
+    year: number;
+    amount: number;
+    type: 'expense' | 'shock';
+  } | null>(null);
 
   // --- Auth Listener ---
   useEffect(() => {
@@ -1902,26 +1908,34 @@ export default function App() {
     }
   };
 
-  const addMilestone = async (type: 'expense' | 'shock') => {
+  const handleStartAddMilestone = (type: 'expense' | 'shock') => {
+    setMilestoneDraft({
+      name: type === 'shock' ? (lang === 'th' ? 'วิกฤตสุขภาพ' : 'Health Shock') : (lang === 'th' ? 'ค่าใช้จ่ายใหม่' : 'New Expense'),
+      year: new Date().getFullYear() + (type === 'shock' ? 10 : 5),
+      amount: type === 'shock' ? 1000000 : 500000,
+      type
+    });
+  };
+
+  const saveMilestone = async () => {
+    if (!milestoneDraft) return;
+    
     if (!user) {
       const newM: Milestone = {
         id: Math.random().toString(36).substr(2, 9),
-        name: type === 'shock' ? (lang === 'th' ? 'วิกฤตสุขภาพ' : 'Health Shock') : (lang === 'th' ? 'ค่าใช้จ่ายใหม่' : 'New Expense'),
-        year: new Date().getFullYear() + (type === 'shock' ? 10 : 5),
-        amount: type === 'shock' ? 1000000 : 500000,
-        type
+        ...milestoneDraft
       };
       setMilestones(prev => [...prev, newM]);
+      setMilestoneDraft(null);
       return;
     }
+
     try {
       await addDoc(collection(db, 'users', user.uid, 'milestones'), {
-        name: type === 'shock' ? (lang === 'th' ? 'วิกฤตสุขภาพ' : 'Health Shock') : (lang === 'th' ? 'ค่าใช้จ่ายใหม่' : 'New Expense'),
-        year: new Date().getFullYear() + (type === 'shock' ? 10 : 5),
-        amount: type === 'shock' ? 1000000 : 500000,
-        type,
+        ...milestoneDraft,
         updatedAt: new Date().toISOString()
       });
+      setMilestoneDraft(null);
     } catch (e) {
       handleFirestoreError(e, OperationType.CREATE, `users/${user.uid}/milestones`);
     }
@@ -3233,23 +3247,75 @@ export default function App() {
                   </div>
 
                   <div className="grid grid-cols-1 gap-4 p-4 bg-zinc-50 rounded-2xl border border-zinc-100">
-                    <div className="flex items-center justify-between">
-                      <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest">{t.addMilestone}</span>
-                      <div className="flex gap-2">
+                    {milestoneDraft ? (
+                      <div className="space-y-4">
+                        <div className="flex items-center justify-between border-b border-zinc-200 pb-2 mb-2">
+                          <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest">
+                            {milestoneDraft.type === 'shock' ? t.healthShock : t.majorExpense}
+                          </span>
+                          <button onClick={() => setMilestoneDraft(null)} className="text-zinc-400 hover:text-rose-500">
+                            <X className="w-4 h-4" />
+                          </button>
+                        </div>
+                        <div className="grid grid-cols-1 gap-4">
+                          <div className="space-y-1.5">
+                            <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest tracking-tighter">{t.milestoneName}</label>
+                            <input 
+                              type="text"
+                              className="w-full bg-white border border-zinc-200 rounded-xl px-3 py-2 text-sm font-medium focus:ring-2 focus:ring-rose-500/10 outline-none"
+                              value={milestoneDraft.name}
+                              onChange={(e) => setMilestoneDraft({...milestoneDraft, name: e.target.value})}
+                            />
+                          </div>
+                          <div className="grid grid-cols-2 gap-4">
+                            <div className="space-y-1.5">
+                              <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest tracking-tighter">{t.milestoneYear}</label>
+                              <input 
+                                type="number"
+                                className="w-full bg-white border border-zinc-200 rounded-xl px-3 py-2 text-sm font-medium focus:ring-2 focus:ring-rose-500/10 outline-none"
+                                value={milestoneDraft.year}
+                                onChange={(e) => setMilestoneDraft({...milestoneDraft, year: Number(e.target.value)})}
+                              />
+                            </div>
+                            <div className="space-y-1.5">
+                              <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest tracking-tighter">{t.milestoneAmount}</label>
+                              <input 
+                                type="number"
+                                className="w-full bg-white border border-zinc-200 rounded-xl px-3 py-2 text-sm font-medium focus:ring-2 focus:ring-rose-500/10 outline-none font-mono"
+                                value={milestoneDraft.amount}
+                                onChange={(e) => setMilestoneDraft({...milestoneDraft, amount: Number(e.target.value)})}
+                              />
+                            </div>
+                          </div>
+                        </div>
                         <button 
-                          onClick={() => addMilestone('expense')}
-                          className="p-1.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-all shadow-md shadow-blue-100"
+                          onClick={saveMilestone}
+                          className="w-full py-3 bg-zinc-900 text-white rounded-xl font-bold text-xs uppercase tracking-widest hover:bg-zinc-800 transition-all shadow-lg shadow-zinc-200"
                         >
-                          <Plus className="w-4 h-4" />
-                        </button>
-                        <button 
-                          onClick={() => addMilestone('shock')}
-                          className="p-1.5 bg-rose-600 text-white rounded-lg hover:bg-rose-700 transition-all shadow-md shadow-rose-100"
-                        >
-                          <AlertTriangle className="w-4 h-4" />
+                          {t.add}
                         </button>
                       </div>
-                    </div>
+                    ) : (
+                      <div className="flex items-center justify-between">
+                        <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest">{t.addMilestone}</span>
+                        <div className="flex gap-2">
+                          <button 
+                            onClick={() => handleStartAddMilestone('expense')}
+                            className="p-1.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-all shadow-md shadow-blue-100 flex items-center gap-2 px-3"
+                          >
+                            <Plus className="w-4 h-4" />
+                            <span className="hidden sm:inline text-[10px] font-bold uppercase tracking-widest">{t.majorExpense}</span>
+                          </button>
+                          <button 
+                            onClick={() => handleStartAddMilestone('shock')}
+                            className="p-1.5 bg-rose-600 text-white rounded-lg hover:bg-rose-700 transition-all shadow-md shadow-rose-100 flex items-center gap-2 px-3"
+                          >
+                            <AlertTriangle className="w-4 h-4" />
+                            <span className="hidden sm:inline text-[10px] font-bold uppercase tracking-widest">{t.healthShock}</span>
+                          </button>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
               </Card>
