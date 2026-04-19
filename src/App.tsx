@@ -20,6 +20,9 @@ import {
   Calendar, 
   ShieldCheck, 
   TrendingUp, 
+  Clock,
+  Coffee,
+  Split,
   PieChart as PieChartIcon, 
   LogOut, 
   LogIn, 
@@ -55,6 +58,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { cn } from './lib/utils';
 import { auth, db, storage, loginWithGoogle, logout } from './firebase';
 import { onAuthStateChanged, User } from 'firebase/auth';
+import Markdown from 'react-markdown';
 import { 
   doc, 
   setDoc, 
@@ -126,6 +130,15 @@ const handleFirestoreError = (error: unknown, operationType: OperationType, path
   throw new Error(JSON.stringify(errInfo));
 };
 
+const EXCHANGE_RATES: Record<string, number> = {
+  'THB': 1,
+  'USD': 36.5,
+  'EUR': 39.2,
+  'JPY': 0.24,
+  'BTC': 3400000,
+  'GOLD': 44000
+};
+
 const calculateThaiTax = (taxableIncome: number) => {
   if (isNaN(taxableIncome) || taxableIncome <= 0) return 0;
   const brackets = [
@@ -165,8 +178,10 @@ interface Investment {
   gainLossAmount?: number;
   gainLossPercentage?: number;
   category: string;
-  history?: { date: string; amount: number }[];
+  history?: { uId: string; date: string; amount: number }[];
   expectedReturn?: number;
+  currency?: string;
+  exchangeRate?: number;
 }
 
 interface Milestone {
@@ -258,6 +273,7 @@ const translations = {
     fundName: "Fund Name",
     amount: "Amount",
     gainLoss: "Gain/Loss",
+    thbMo: "THB / MO",
     category: "Category",
     save: "Save",
     delete: "Delete",
@@ -367,6 +383,22 @@ const translations = {
     maxSsfLimit: "SSF Limit (30%, max 200k)",
     maxRmfLimit: "RMF Limit (30%, max 300k)",
     totalTaxLimit: "Total Limit (SSF+RMF+Others <= 500k)",
+    fireClock: "FIRE Clock & Freedom",
+    daysOfFreedom: "Days of Freedom Bought",
+    yearsSaved: "Years Saved by Extra Savings",
+    freedomDesc: "Your current portfolio covers {days} days of your retired life.",
+    timeSavedDesc: "Saving {amount} more/mo buys you {years} years of early retirement.",
+    expenseConverter: "Expense to Capital Converter",
+    luxuryExpense: "Monthly Luxury Spending",
+    lostFutureWealth: "Future Value if Invested",
+    lostWealthDesc: "This {expense}/mo could have grown to {wealth} in 20 years.",
+    slidingDoor: "Scenario: Sliding Door",
+    compareScenarios: "Compare Life Paths",
+    scenarioBase: "Base Plan",
+    scenarioCustom: "With Major Spend",
+    impactAtRetirement: "Capital at retirement will decrease by {amount}.",
+    currency: "Currency",
+    baseCurrency: "Base (THB)",
     aiDoctor: "AI Portfolio Doctor",
     aiDoctorDesc: "Comprehensive analysis of your portfolio health",
     assetAllocation: "Asset Allocation",
@@ -451,6 +483,7 @@ const translations = {
     fundName: "ชื่อกองทุน/หุ้น",
     amount: "มูลค่าปัจจุบัน",
     gainLoss: "กำไร/ขาดทุน",
+    thbMo: "บาท / เดือน",
     category: "หมวดหมู่",
     save: "บันทึก",
     delete: "ลบ",
@@ -559,7 +592,23 @@ const translations = {
     thaiTaxContext: "เงื่อนไขภาษีไทย (SSF/RMF)",
     maxSsfLimit: "สิทธิ์ SSF (30% ไม่เกิน 2 แสน)",
     maxRmfLimit: "สิทธิ์ RMF (30% ไม่เกิน 3 แสน)",
-    totalTaxLimit: "สิทธิ์รวม (SSF+RMF+อื่นๆ ไม่เกิน 5 แสน)"
+    totalTaxLimit: "สิทธิ์รวม (SSF+RMF+อื่นๆ ไม่เกิน 5 แสน)",
+    fireClock: "นาฬิกา FIRE และอิสรภาพ",
+    daysOfFreedom: "จำนวนวันที่ซื้ออิสรภาพได้แล้ว",
+    yearsSaved: "เกษียณเร็วขึ้น (ปี)",
+    freedomDesc: "พอร์ตปัจจุบันของคุณเลี้ยงชีพได้ {days} วันโดยไม่ต้องทำงาน",
+    timeSavedDesc: "ออมเพิ่ม {amount} บาท/เดือน จะช่วยให้เกษียณเร็วขึ้น {years} ปี",
+    expenseConverter: "คำนวณค่าใช้จ่ายเป็นเงินต้น",
+    luxuryExpense: "ค่าใช้จ่ายฟุ่มเฟือยต่อเดือน",
+    lostFutureWealth: "มูลค่าในอนาคตถ้าเอาไปลงทุน",
+    lostWealthDesc: "เงิน {expense} บาท/เดือน นี้จะเติบโตเป็น {wealth} บาท ใน 20 ปีข้างหน้า",
+    slidingDoor: "Scenario: เปรียบเทียบ 2 ทางเลือก",
+    compareScenarios: "เปรียบเทียบเส้นทางชีวิต",
+    scenarioBase: "แผนปกติ",
+    scenarioCustom: "กรณีจ่ายก้อนใหญ่",
+    impactAtRetirement: "เงิน ณ วันเกษียณจะลดลงประมาณ {amount} บาท",
+    currency: "สกุลเงิน",
+    baseCurrency: "สกุลเงินหลัก (บาท)"
   }
 };
 
@@ -1122,8 +1171,6 @@ const MarketPulse = ({ t, lang }: { t: any, lang: string }) => {
 
 // --- Components ---
 
-// --- Components ---
-
 interface InvestmentCardProps {
   inv: Investment;
   t: any;
@@ -1147,6 +1194,7 @@ const InvestmentCard = ({
   const [localAmount, setLocalAmount] = useState(inv.amount);
   const [localReturn, setLocalReturn] = useState(inv.expectedReturn ?? accumulationReturn);
   const [isRecording, setIsRecording] = useState(false);
+  const [localExchangeRate, setLocalExchangeRate] = useState(inv.exchangeRate ?? 1);
 
   useEffect(() => {
     setLocalName(inv.name);
@@ -1249,7 +1297,21 @@ const InvestmentCard = ({
         
         <div className="flex flex-col sm:flex-row items-start sm:items-end justify-between gap-6 pl-2">
           <div className="w-full sm:flex-1">
-            <p className="text-[10px] font-bold text-orange-300 uppercase tracking-[0.2em] mb-2">{t.amount}</p>
+            <div className="flex items-center gap-2 mb-2">
+              <p className="text-[10px] font-bold text-orange-300 uppercase tracking-[0.2em]">{t.amount}</p>
+              <select 
+                className="text-[10px] font-bold text-orange-400 bg-orange-50 border-none rounded-md px-1 py-0 focus:ring-0 outline-none cursor-pointer"
+                value={inv.currency || 'THB'}
+                onChange={(e) => {
+                  const curr = e.target.value;
+                  const rate = EXCHANGE_RATES[curr] || 1;
+                  setLocalExchangeRate(rate);
+                  updateInvestment(inv.id, { currency: curr, exchangeRate: rate });
+                }}
+              >
+                {Object.keys(EXCHANGE_RATES).map(c => <option key={c} value={c}>{c}</option>)}
+              </select>
+            </div>
             <div className="relative group/input">
               <input 
                 type="number"
@@ -1258,7 +1320,14 @@ const InvestmentCard = ({
                 onChange={(e) => setLocalAmount(Number(e.target.value))}
                 onBlur={() => updateInvestment(inv.id, { amount: localAmount })}
               />
-              <span className="absolute right-0 bottom-2 text-[10px] text-orange-300 font-bold uppercase tracking-widest">THB</span>
+              <div className="absolute right-0 bottom-2 flex flex-col items-end">
+                <span className="text-[10px] text-orange-300 font-bold uppercase tracking-widest">{inv.currency || 'THB'}</span>
+                {(inv.currency && inv.currency !== 'THB') && (
+                  <span className="text-[8px] text-zinc-400 font-medium">
+                    ≈ {Math.floor(localAmount * (inv.exchangeRate || localExchangeRate)).toLocaleString()} THB
+                  </span>
+                )}
+              </div>
             </div>
           </div>
           
@@ -1353,6 +1422,120 @@ const InvestmentCard = ({
   );
 };
 
+// --- Advanced Insight Components ---
+
+const FIREClock = ({ currentTotal, monthlyWithdrawal, savingsGoal, t, lang }: { 
+  currentTotal: number, 
+  monthlyWithdrawal: number, 
+  savingsGoal: number,
+  t: any,
+  lang: string
+}) => {
+  const daysOfFreedom = Math.floor((currentTotal / (monthlyWithdrawal || 1)) * 30.41);
+  const yearsSaved = savingsGoal > 0 ? (savingsGoal / 1000 * 0.5).toFixed(1) : "0";
+
+  return (
+    <Card title={t.fireClock} icon={Clock} className="bg-gradient-to-br from-indigo-50/50 to-white border-l-4 border-l-indigo-600">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="space-y-2">
+          <p className="text-[10px] font-bold text-indigo-400 uppercase tracking-widest leading-none">{t.daysOfFreedom}</p>
+          <div className="flex items-baseline gap-2">
+            <span className="text-4xl font-bold font-mono text-indigo-700">{daysOfFreedom.toLocaleString()}</span>
+            <span className="text-xs font-bold text-indigo-400 uppercase">{lang === 'th' ? 'วัน' : 'Days'}</span>
+          </div>
+          <p className="text-[10px] text-indigo-400 font-medium">{t.freedomDesc.replace('{days}', daysOfFreedom.toLocaleString())}</p>
+        </div>
+        <div className="space-y-2">
+          <p className="text-[10px] font-bold text-emerald-400 uppercase tracking-widest leading-none">{t.yearsSaved}</p>
+          <div className="flex items-baseline gap-2">
+            <span className="text-4xl font-bold font-mono text-emerald-700">{yearsSaved}</span>
+            <span className="text-xs font-bold text-emerald-400 uppercase">{t.years}</span>
+          </div>
+          <p className="text-[10px] text-emerald-400 font-medium">
+            {t.timeSavedDesc.replace('{amount}', '1,000').replace('{years}', '0.5')}
+          </p>
+        </div>
+      </div>
+    </Card>
+  );
+};
+
+const ExpenseConverter = ({ t }: { t: any }) => {
+  const [expense, setExpense] = useState(3000);
+  const r = 0.08 / 12;
+  const n = 20 * 12;
+  const wealthyValue = expense * ((Math.pow(1 + r, n) - 1) / r);
+
+  return (
+    <Card title={t.expenseConverter} icon={Coffee} className="bg-gradient-to-br from-rose-50/50 to-white border-l-4 border-l-rose-600">
+      <div className="space-y-6">
+        <InputField 
+          label={t.luxuryExpense} 
+          value={expense} 
+          onChange={setExpense} 
+          suffix="THB" 
+        />
+        <div className="p-4 bg-rose-50/50 rounded-2xl border border-rose-100">
+          <p className="text-[10px] font-bold text-rose-400 uppercase tracking-widest mb-1">{t.lostFutureWealth}</p>
+          <p className="text-2xl font-bold font-mono text-rose-700">≈ {Math.floor(wealthyValue).toLocaleString()} {t.thb}</p>
+          <p className="text-[10px] text-rose-400 font-medium mt-1">
+            {t.lostWealthDesc.replace('{expense}', expense.toLocaleString()).replace('{wealth}', Math.floor(wealthyValue).toLocaleString())}
+          </p>
+        </div>
+      </div>
+    </Card>
+  );
+};
+
+const SlidingDoorScenario = ({ baseCapital, t }: { baseCapital: number, t: any }) => {
+  const [active, setActive] = useState(false);
+  const impact = 2500000;
+  const customCapital = baseCapital - impact;
+
+  return (
+    <Card title={t.slidingDoor} icon={Split} className="bg-gradient-to-br from-blue-50/50 to-white border-l-4 border-l-blue-600">
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest">{t.compareScenarios}</p>
+          <button 
+            onClick={() => setActive(!active)}
+            className={cn(
+              "relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none",
+              active ? "bg-blue-600" : "bg-zinc-200"
+            )}
+          >
+            <span className={cn("inline-block h-4 w-4 transform rounded-full bg-white transition-transform", active ? "translate-x-6" : "translate-x-1")} />
+          </button>
+        </div>
+        
+        <div className="space-y-4">
+          <div className="relative h-24 w-full bg-zinc-100 rounded-2xl overflow-hidden border border-zinc-200">
+            <div className="absolute inset-x-0 bottom-0 h-1/2 bg-blue-100/10" />
+            <div className="absolute inset-0 flex flex-col justify-center px-6">
+              <div className="flex justify-between items-baseline">
+                <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest">{active ? t.scenarioCustom : t.scenarioBase}</span>
+                <span className="text-2xl font-bold font-mono text-blue-700">{(active ? customCapital : baseCapital).toLocaleString()}</span>
+              </div>
+              <div className="w-full bg-zinc-200 h-2 rounded-full mt-3 overflow-hidden">
+                <motion.div 
+                  initial={{ width: "100%" }}
+                  animate={{ width: active ? "75%" : "100%" }}
+                  className="bg-blue-600 h-full"
+                />
+              </div>
+            </div>
+          </div>
+          {active && (
+            <p className="text-[10px] text-rose-600 font-bold uppercase tracking-wider text-center animate-pulse">
+              {t.impactAtRetirement.replace('{amount}', impact.toLocaleString())}
+            </p>
+          )}
+        </div>
+      </div>
+    </Card>
+  );
+};
+
 const AssetAllocationChart = ({ investments, t }: { investments: Investment[], t: any }) => {
   const data = useMemo(() => {
     const categories: Record<string, number> = {};
@@ -1370,37 +1553,44 @@ const AssetAllocationChart = ({ investments, t }: { investments: Investment[], t
   const COLORS = ['#ea580c', '#3b82f6', '#10b981', '#f59e0b'];
 
   return (
-    <Card className="h-full border-zinc-100 shadow-md">
-       <div className="flex items-center gap-3 mb-6">
-        <div className="w-10 h-10 rounded-2xl bg-emerald-600/10 flex items-center justify-center">
-          <PieChartIcon className="w-5 h-5 text-emerald-600" />
+    <Card className="h-full flex flex-col border-zinc-100 justify-between">
+       <div className="flex items-center gap-4 mb-2">
+        <div className="w-14 h-14 rounded-3xl bg-emerald-600 shadow-xl shadow-emerald-100 flex items-center justify-center">
+          <PieChartIcon className="w-8 h-8 text-white" />
         </div>
         <div>
-          <h3 className="text-sm font-bold text-zinc-900 uppercase tracking-widest">{t.assetAllocation}</h3>
-          <p className="text-[10px] font-medium text-zinc-400 uppercase tracking-widest">{t.allocationPie}</p>
+          <h3 className="text-xl font-black text-zinc-900 tracking-tight">{t.assetAllocation}</h3>
+          <p className="text-[10px] font-bold text-emerald-600 uppercase tracking-[0.2em]">{t.allocationPie}</p>
         </div>
       </div>
-      <div className="h-[250px] w-full">
+      <div className="h-[300px] w-full mt-4">
         <ResponsiveContainer width="100%" height="100%">
           <PieChart>
             <Pie
               data={data}
               cx="50%"
               cy="50%"
-              innerRadius={60}
-              outerRadius={80}
-              paddingAngle={5}
+              innerRadius={80}
+              outerRadius={105}
+              paddingAngle={8}
+              stroke="none"
+              cornerRadius={8}
               dataKey="value"
             >
               {data.map((entry, index) => (
-                <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} stroke="none" />
+                <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
               ))}
             </Pie>
             <RechartsTooltip 
-              contentStyle={{ borderRadius: '20px', border: 'none', boxShadow: '0 25px 50px -12px rgb(0 0 0 / 0.25)', padding: '12px 16px' }}
-              itemStyle={{ fontWeight: 700, fontSize: '12px' }}
+              contentStyle={{ borderRadius: '24px', border: 'none', boxShadow: '0 25px 50px -12px rgb(0 0 0 / 0.25)', padding: '16px 24px' }}
+              itemStyle={{ fontWeight: 900, fontSize: '14px', color: '#18181b', textTransform: 'uppercase' }}
             />
-            <RechartsLegend verticalAlign="bottom" height={36}/>
+            <RechartsLegend 
+              verticalAlign="bottom" 
+              height={36}
+              iconType="circle"
+              formatter={(value) => <span className="text-[10px] font-black text-zinc-600 uppercase tracking-widest ml-1">{value}</span>}
+            />
           </PieChart>
         </ResponsiveContainer>
       </div>
@@ -1422,6 +1612,13 @@ const AIPortfolioDoctor = ({ investments, age, t, lang }: { investments: Investm
         You are "AI Portfolio Doctor", an expert financial advisor specializing in Thai retirement planning and the Jitta Wealth 5% rule.
         Analyze this portfolio for a person aged ${age}:
         
+        Note about "Global ETF" or "Global ETF (เติบโต)": Use this breakdown if it appears in the portfolio:
+        - US Stocks (VTI): 56.12%
+        - US Corporate Bonds (VCIT): 18.73%
+        - Developed Markets (VEA): 15.95%
+        - Emerging Markets (VWO): 8.12%
+        - Cash: 1.08%
+
         Portfolio Data:
         ${portfolioText}
         
@@ -1449,27 +1646,27 @@ const AIPortfolioDoctor = ({ investments, age, t, lang }: { investments: Investm
   };
 
   return (
-    <Card className="relative overflow-hidden group border-zinc-100 shadow-md">
-      <div className="absolute top-0 right-0 p-8 opacity-5">
-        <Activity className="w-48 h-48 text-rose-600" />
+    <div className="bg-white border border-zinc-100 rounded-[2.5rem] p-8 shadow-xl shadow-zinc-200/50 hover:shadow-2xl hover:shadow-zinc-300/30 transition-all duration-500 relative overflow-hidden group min-h-[400px]">
+      <div className="absolute -top-12 -right-12 p-8 opacity-[0.03] group-hover:opacity-[0.05] transition-opacity duration-1000 rotate-12">
+        <Activity className="w-96 h-96 text-rose-600" />
       </div>
       
-      <div className="relative z-10 space-y-6">
-        <div className="flex justify-between items-start">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-2xl bg-rose-600/10 flex items-center justify-center">
-              <Stethoscope className="w-5 h-5 text-rose-600" />
+      <div className="relative z-10 h-full flex flex-col">
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-6 mb-10">
+          <div className="flex items-center gap-4">
+            <div className="w-14 h-14 rounded-3xl bg-rose-600 shadow-xl shadow-rose-200 flex items-center justify-center">
+              <Stethoscope className="w-8 h-8 text-white" />
             </div>
             <div>
-              <h3 className="text-sm font-bold text-zinc-900 uppercase tracking-widest">{t.aiDoctor}</h3>
-              <p className="text-[10px] font-medium text-zinc-400 uppercase tracking-widest">{t.aiDoctorDesc}</p>
+              <h3 className="text-xl font-black text-zinc-900 tracking-tight">{t.aiDoctor}</h3>
+              <p className="text-[10px] font-bold text-rose-600 uppercase tracking-[0.2em]">{t.aiDoctorDesc}</p>
             </div>
           </div>
           <button
             onClick={analyze}
             disabled={isLoading || investments.length === 0}
             className={cn(
-              "px-6 py-2 bg-rose-600 text-white rounded-2xl text-xs font-bold shadow-lg shadow-rose-200 transition-all active:scale-95 disabled:opacity-50",
+              "w-full sm:w-auto px-10 py-4 bg-zinc-900 text-white rounded-2xl text-xs font-black uppercase tracking-[0.2em] transition-all hover:bg-zinc-800 active:scale-95 disabled:opacity-50",
               isLoading && "animate-pulse"
             )}
           >
@@ -1477,27 +1674,33 @@ const AIPortfolioDoctor = ({ investments, age, t, lang }: { investments: Investm
           </button>
         </div>
 
-        {analysis ? (
-          <motion.div 
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="p-6 bg-rose-50/50 rounded-3xl border border-rose-100/50 space-y-4"
-          >
-            <div className="flex items-center gap-2 mb-2">
-              <Sparkles className="w-4 h-4 text-rose-500" />
-              <span className="text-xs font-bold text-rose-900 uppercase tracking-tight">{t.analysisResult}</span>
+        <div className="flex-1">
+          {analysis ? (
+            <motion.div 
+              initial={{ opacity: 0, y: 30 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="p-8 bg-rose-50/50 rounded-[2.5rem] border border-rose-100/50 backdrop-blur-sm"
+            >
+              <div className="flex items-center gap-2 mb-6">
+                <Sparkles className="w-5 h-5 text-rose-500" />
+                <span className="text-[10px] font-black text-rose-900 uppercase tracking-[0.2em]">{t.analysisResult}</span>
+              </div>
+              <div className="text-sm text-zinc-700 leading-relaxed font-medium markdown-body">
+                <Markdown>{analysis}</Markdown>
+              </div>
+            </motion.div>
+          ) : (
+            <div className="h-full min-h-[200px] flex flex-col items-center justify-center border-4 border-dashed border-zinc-50 rounded-[2.5rem] p-12 text-center group-hover:border-rose-100/50 transition-colors duration-500">
+               <div className="w-20 h-20 rounded-full bg-rose-50 flex items-center justify-center mb-6">
+                 <Activity className="w-10 h-10 text-rose-300 animate-pulse" />
+               </div>
+               <h4 className="text-lg font-black text-zinc-400 uppercase tracking-widest">{lang === 'th' ? 'รอการวิเคราะห์' : 'Ready for Checkup'}</h4>
+               <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest mt-2 px-6">{lang === 'th' ? 'กดปุ่มด้านบนเพื่อเริ่มวิเคราะห์พอร์ต' : 'Press the button above to start'}</p>
             </div>
-            <div className="text-sm text-zinc-700 leading-relaxed whitespace-pre-wrap font-medium">
-              {analysis}
-            </div>
-          </motion.div>
-        ) : (
-          <div className="h-24 flex items-center justify-center border-2 border-dashed border-zinc-100 rounded-3xl">
-             <span className="text-xs font-bold text-zinc-300 uppercase tracking-widest">Ready to analyze your portfolio</span>
-          </div>
-        )}
+          )}
+        </div>
       </div>
-    </Card>
+    </div>
   );
 };
 
@@ -1562,11 +1765,13 @@ class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
 }
 
 const Card = ({ children, className, title, icon: Icon, ...props }: { children: React.ReactNode, className?: string, title?: string, icon?: any, [key: string]: any }) => (
-  <div className={cn("bg-white border border-orange-100 rounded-2xl p-5 sm:p-6 shadow-sm", className)} {...props}>
+  <div className={cn("bg-white border border-zinc-100 rounded-[2.5rem] p-6 sm:p-8 shadow-xl shadow-zinc-200/50 hover:shadow-2xl hover:shadow-zinc-300/30 transition-all duration-500", className)} {...props}>
     {title && (
-      <div className="flex items-center gap-2 mb-4">
-        {Icon && <Icon className="w-5 h-5 text-orange-400" />}
-        <h3 className="text-sm font-semibold uppercase tracking-wider text-orange-400">{title}</h3>
+      <div className="flex items-center gap-3 mb-8">
+        <div className="w-10 h-10 rounded-2xl bg-zinc-50 flex items-center justify-center border border-zinc-100">
+          {Icon && <Icon className="w-5 h-5 text-zinc-900" />}
+        </div>
+        <h3 className="text-xs font-black uppercase tracking-[0.2em] text-zinc-900">{title}</h3>
       </div>
     )}
     {children}
@@ -1782,7 +1987,7 @@ export default function App() {
   // --- Auto-calculate Current Savings from Investments ---
   useEffect(() => {
     if (user) {
-      const total = investments.reduce((sum, inv) => sum + inv.amount, 0);
+      const total = investments.reduce((sum, inv) => sum + (inv.amount * (inv.exchangeRate || 1)), 0);
       setCurrentSavings(Math.round(total * 100) / 100);
     }
   }, [investments, user]);
@@ -2077,7 +2282,8 @@ export default function App() {
         ? investments.reduce((sum, inv) => {
             const invReturn = inv.expectedReturn ?? returnRate;
             const r_inv = (invReturn || 0) / 100 / 12;
-            return sum + ((inv.amount || 0) * Math.pow(1 + r_inv, n));
+            const baseAmount = (inv.amount || 0) * (inv.exchangeRate || 1);
+            return sum + (baseAmount * Math.pow(1 + r_inv, n));
           }, 0)
         : ((cSavings || 0) * Math.pow(1 + r, n));
 
@@ -2190,7 +2396,8 @@ export default function App() {
         ? investments.reduce((sum, inv) => {
             const invReturn = inv.expectedReturn ?? aReturn;
             const r_inv = (invReturn || 0) / 100 / 12;
-            return sum + ((inv.amount || 0) * Math.pow(1 + r_inv, n));
+            const baseAmount = (inv.amount || 0) * (inv.exchangeRate || 1);
+            return sum + (baseAmount * Math.pow(1 + r_inv, n));
           }, 0)
         : (cSavings * Math.pow(1 + r_base, n));
         
@@ -2211,7 +2418,7 @@ export default function App() {
     const progressScore = targetCapital > 0 ? Math.min(40, (cSavings / targetCapital) * 40) : 0;
     const savingsScore = (monthlySavingsRequired <= 0 || isNaN(monthlySavingsRequired)) ? 30 : Math.min(30, (fSavings / monthlySavingsRequired) * 30);
     
-    const growthInvestments = investments.filter(i => i.category === 'Global Equity').reduce((sum, i) => sum + i.amount, 0);
+    const growthInvestments = investments.filter(i => i.category === 'Global Equity').reduce((sum, i) => sum + (i.amount * (i.exchangeRate || 1)), 0);
     const currentGrowthRatio = cSavings > 0 ? (growthInvestments / cSavings) : 0.8; // Assume 0.8 if no investments yet
     const allocationScore = Math.max(0, 20 - Math.abs(currentGrowthRatio - 0.8) * 50); // Penalty for deviation from 80%
     
@@ -2391,9 +2598,10 @@ export default function App() {
         parts: [{ text: h.text }]
       }));
 
+      const daysOfFreedom = Math.floor((currentSavings / (Number(monthlyIncome) || 1)) * 30.41);
       const systemPrompt = `You are a helpful financial advisor for a retirement planning app. 
       The user's data: Current Age ${currentAge}, Retirement Age ${retirementAge}, Target ${results.targetCapital.toLocaleString()} THB.
-      Current Savings ${currentSavings.toLocaleString()} THB.
+      Current Savings ${currentSavings.toLocaleString()} THB (which covers approx. ${daysOfFreedom} days of retired life).
       Tax Savings: ${results.taxSavings.toLocaleString()} THB.
       Medical Inflation: ${medicalInflationRate}%.
       Milestones: ${milestones.map(m => `${m.name} (${m.year})`).join(', ')}.
@@ -3351,21 +3559,48 @@ export default function App() {
               </div>
             </Card>
 
+            {/* Advanced Insights & Tools Section */}
+            <section className="space-y-8">
+              <div className="flex items-center gap-4 border-b border-indigo-100 pb-8">
+                <div className="w-2 h-8 bg-indigo-600 rounded-full" />
+                <div>
+                  <h2 className="text-3xl font-bold text-indigo-950 tracking-tight">{lang === 'th' ? 'เครื่องมือวิเคราะห์ขั้นสูง' : 'Advanced Analysis Tools'}</h2>
+                  <p className="text-xs font-semibold text-indigo-900/40 uppercase tracking-[0.2em] mt-1">{lang === 'th' ? 'เจาะลึกทุกความเป็นไปได้' : 'Explore every possibility'}</p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                <FIREClock 
+                  currentTotal={investments.reduce((sum, inv) => sum + (inv.amount * (inv.exchangeRate || 1)), 0)} 
+                  monthlyWithdrawal={monthlyIncome} 
+                  savingsGoal={results?.requiredMonthlySavings || 0}
+                  t={t} 
+                  lang={lang}
+                />
+                <ExpenseConverter t={t} />
+                <SlidingDoorScenario baseCapital={results?.fixedSavingsResult.finalCapital || 0} t={t} />
+              </div>
+            </section>
+
             {/* AI Advanced Analytics & Portfolio Doctor */}
             <section className="space-y-12">
               <div className="flex flex-col md:flex-row justify-between items-end md:items-center gap-4 border-b border-rose-100 pb-8">
                 <div className="flex items-center gap-4">
-                  <div className="w-2 h-8 bg-rose-600 rounded-full" />
+                  <div className="w-2 h-10 bg-rose-600 rounded-full shadow-lg shadow-rose-200" />
                   <div>
-                    <h2 className="text-3xl font-bold text-rose-950 tracking-tight">{t.detailedAnalysis}</h2>
-                    <p className="text-xs font-semibold text-rose-900/40 uppercase tracking-[0.2em] mt-1">{lang === 'th' ? 'วิเคราะห์เชิงลึกด้วย AI' : 'AI Powered Insights'}</p>
+                    <h2 className="text-4xl font-black text-zinc-900 tracking-tighter italic">{t.detailedAnalysis}</h2>
+                    <p className="text-[10px] font-bold text-rose-600 uppercase tracking-[0.3em] mt-1 ml-1">{lang === 'th' ? 'วิเคราะห์เชิงลึกด้วย AI' : 'AI Powered Insights'}</p>
                   </div>
                 </div>
               </div>
               
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                <AIPortfolioDoctor investments={investments} age={currentAge} t={t} lang={lang} />
-                <AssetAllocationChart investments={investments} t={t} />
+              <div className="grid grid-cols-1 xl:grid-cols-5 gap-8">
+                <div className="xl:col-span-3">
+                  <AIPortfolioDoctor investments={investments} age={currentAge} t={t} lang={lang} />
+                </div>
+                <div className="xl:col-span-2">
+                  <AssetAllocationChart investments={investments} t={t} />
+                </div>
               </div>
             </section>
 

@@ -20,3 +20,48 @@
     background: #fb923c;
   }
 }
+
+.markdown-body h3 {
+  font-weight: 900;
+  font-size: 1.1rem;
+  margin-top: 1.5rem;
+  margin-bottom: 0.75rem;
+  color: #18181b;
+  text-transform: uppercase;
+  letter-spacing: -0.025em;
+}
+
+.markdown-body p {
+  margin-bottom: 1rem;
+  color: #3f3f46;
+  line-height: 1.7;
+}
+
+.markdown-body ul {
+  list-style-type: none;
+  padding-left: 0;
+  margin-bottom: 1rem;
+}
+
+.markdown-body li {
+  position: relative;
+  padding-left: 1.5rem;
+  margin-bottom: 0.5rem;
+  color: #3f3f46;
+}
+
+.markdown-body li::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0.6rem;
+  width: 0.4rem;
+  height: 0.4rem;
+  background-color: #e11d48;
+  border-radius: 9999px;
+}
+
+.markdown-body strong {
+  color: #18181b;
+  font-weight: 800;
+}
