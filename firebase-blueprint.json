@@ -13,6 +13,8 @@
         "accumulationReturn": { "type": "number", "description": "Expected return during accumulation phase" },
         "withdrawalRate": { "type": "number", "description": "Target withdrawal rate percentage" },
         "medicalInflationRate": { "type": "number", "description": "Expected medical inflation rate" },
+        "fixedMonthlySavings": { "type": "number", "description": "User's fixed monthly savings amount" },
+        "currentSavings": { "type": "number", "description": "Total current savings (often synced from investments)" },
         "taxSettings": { "$ref": "TaxSettings" },
         "lang": { "type": "string", "enum": ["en", "th"], "description": "Preferred language" },
         "updatedAt": { "type": "string", "format": "date-time", "description": "Last update timestamp" }
@@ -48,12 +50,15 @@
       "description": "An individual investment or fund entry",
       "type": "object",
       "properties": {
+        "id": { "type": "string", "description": "Local ID from Firestore" },
         "name": { "type": "string", "description": "Name of the fund or asset" },
         "accountNumber": { "type": "string", "description": "Account number or identifier" },
         "amount": { "type": "number", "description": "Current value of the investment" },
         "gainLossAmount": { "type": "number", "description": "Profit or loss in currency" },
         "gainLossPercentage": { "type": "number", "description": "Profit or loss in percentage" },
         "category": { "type": "string", "description": "Investment category (e.g., Global Equity, Cash)" },
+        "history": { "type": "array", "description": "Historical snapshots of the investment value" },
+        "expectedReturn": { "type": "number", "description": "Expected annual return for this asset" },
         "updatedAt": { "type": "string", "format": "date-time", "description": "Last update timestamp" }
       },
       "required": ["name", "amount"]

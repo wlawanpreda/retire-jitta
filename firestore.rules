@@ -62,24 +62,27 @@ service cloud.firestore {
     }
 
     function isValidUserProfile(data) {
-      let allowedFields = ['monthlyIncome', 'currentAge', 'retirementAge', 'inflationRate', 'expectedReturn', 'accumulationReturn', 'withdrawalRate', 'medicalInflationRate', 'taxSettings', 'lang', 'updatedAt', 'role'];
+      let allowedFields = ['monthlyIncome', 'currentAge', 'retirementAge', 'inflationRate', 'expectedReturn', 'accumulationReturn', 'withdrawalRate', 'medicalInflationRate', 'fixedMonthlySavings', 'currentSavings', 'taxSettings', 'lang', 'updatedAt', 'role'];
       return data.keys().hasOnly(allowedFields) &&
              data.keys().hasAll(['monthlyIncome', 'currentAge', 'retirementAge']) &&
              data.monthlyIncome is number && data.monthlyIncome >= 0 &&
              data.currentAge is number && data.currentAge >= 0 && data.currentAge < 120 &&
              data.retirementAge is number && data.retirementAge > 0 && data.retirementAge < 120 &&
+             (!('fixedMonthlySavings' in data) || data.fixedMonthlySavings is number) &&
+             (!('currentSavings' in data) || data.currentSavings is number) &&
              (!('lang' in data) || data.lang in ['en', 'th']) &&
              (!('taxSettings' in data) || data.taxSettings is map) &&
              (!('role' in data) || (data.role == 'user' || isAdmin()));
     }
 
     function isValidInvestment(data) {
-      let allowedFields = ['name', 'amount', 'category', 'updatedAt', 'accountNumber', 'gainLossAmount', 'gainLossPercentage', 'expectedReturn'];
+      let allowedFields = ['id', 'name', 'amount', 'category', 'updatedAt', 'accountNumber', 'gainLossAmount', 'gainLossPercentage', 'expectedReturn', 'history'];
       return data.keys().hasOnly(allowedFields) &&
              data.keys().hasAll(['name', 'amount']) &&
              data.name is string && data.name.size() > 0 && data.name.size() < 100 &&
              data.amount is number &&
-             (!('category' in data) || (data.category is string && data.category.size() < 50));
+             (!('category' in data) || (data.category is string && data.category.size() < 50)) &&
+             (!('history' in data) || (data.history is list && data.history.size() <= 365)); // Limit to ~1 year of daily entries
     }
 
     function isValidMilestone(data) {

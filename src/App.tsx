@@ -268,6 +268,8 @@ const translations = {
     snapshot: "Record Value",
     history: "History",
     noHistory: "No history",
+    addHistory: "Add History Entry",
+    add: "Add",
     suggestedFeatures: "Suggested Features",
     dividendTracking: "Dividend Tracking",
     rebalancingAlerts: "Rebalancing Alerts",
@@ -453,6 +455,8 @@ const translations = {
     snapshot: "บันทึกประวัติ",
     history: "ประวัติ",
     noHistory: "ยังไม่มีประวัติ",
+    addHistory: "เพิ่มรายการประวัติ",
+    add: "เพิ่ม",
     suggestedFeatures: "ฟีเจอร์แนะนำเพิ่มเติม",
     dividendTracking: "ระบบติดตามปันผล",
     rebalancingAlerts: "แจ้งเตือนการปรับพอร์ต",
@@ -595,17 +599,27 @@ interface CalculationResult {
 const DetailedInvestmentModal = ({ 
   investment, 
   onClose, 
-  t 
+  onAddHistory,
+  onDeleteHistory,
+  t,
+  lang
 }: { 
   investment: Investment, 
   onClose: () => void, 
-  t: any 
+  onAddHistory: (amount: number, date: string) => Promise<void>,
+  onDeleteHistory: (uId: string) => Promise<void>,
+  t: any,
+  lang: string
 }) => {
+  const [newAmount, setNewAmount] = useState<string>(investment.amount.toString());
+  const [newDate, setNewDate] = useState<string>(new Date().toISOString().split('T')[0]);
+  const [isAdding, setIsAdding] = useState(false);
+
   const historyData = useMemo(() => {
     if (!investment.history || investment.history.length === 0) return [];
     
     const firstAmount = investment.history[0].amount;
-    return investment.history.map((h) => {
+    return investment.history.map((h, originalIndex) => {
       const gainLoss = h.amount - firstAmount;
       const gainLossPct = firstAmount !== 0 ? (gainLoss / firstAmount) * 100 : 0;
       
@@ -780,6 +794,100 @@ const DetailedInvestmentModal = ({
                   </AreaChart>
                 </ResponsiveContainer>
               </div>
+            </div>
+          </div>
+
+          {/* History Log Table */}
+          <div className="bg-white p-6 rounded-3xl border border-orange-100">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+              <h3 className="text-xs font-bold text-orange-900 uppercase tracking-widest flex items-center gap-2">
+                <div className="w-6 h-6 rounded-lg bg-orange-100 flex items-center justify-center">
+                  <TableIcon className="w-3.5 h-3.5 text-orange-600" />
+                </div>
+                {t.history}
+              </h3>
+
+              <div className="flex items-center gap-2 bg-orange-50/50 p-2 rounded-2xl border border-orange-100">
+                <input 
+                  type="date"
+                  value={newDate}
+                  onChange={(e) => setNewDate(e.target.value)}
+                  className="bg-transparent text-[10px] font-bold text-orange-900 focus:outline-none w-28"
+                />
+                <div className="w-px h-4 bg-orange-200" />
+                <input 
+                  type="number"
+                  placeholder={t.amount}
+                  value={newAmount}
+                  onChange={(e) => setNewAmount(e.target.value)}
+                  className="bg-transparent text-[10px] font-bold text-orange-900 focus:outline-none w-20 px-1"
+                />
+                <button 
+                  onClick={async () => {
+                    if (!newAmount || isAdding) return;
+                    setIsAdding(true);
+                    try {
+                      await onAddHistory(Number(newAmount), newDate);
+                      setNewAmount(''); // Clear amount after success
+                      alert(lang === 'th' ? 'เพิ่มสำเร็จ!' : 'Added successfully!');
+                    } catch (e) {
+                      // Error handled by re-throwing and global handler
+                    } finally {
+                      setIsAdding(false);
+                    }
+                  }}
+                  disabled={isAdding}
+                  className="w-6 h-6 rounded-lg bg-orange-600 text-white flex items-center justify-center hover:bg-orange-700 transition-colors disabled:opacity-50"
+                  title={t.add}
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-left">
+                <thead>
+                  <tr className="border-b border-orange-50">
+                    <th className="pb-4 text-[10px] font-bold text-orange-300 uppercase tracking-widest">{t.date}</th>
+                    <th className="pb-4 text-[10px] font-bold text-orange-300 uppercase tracking-widest text-right">{t.amount}</th>
+                    <th className="pb-4 text-[10px] font-bold text-orange-300 uppercase tracking-widest text-right">{t.growth}</th>
+                    <th className="pb-4 text-[10px] font-bold text-orange-300 uppercase tracking-widest text-right"></th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-orange-50">
+                  {historyData.slice().reverse().map((entry, idx) => (
+                    <tr key={idx} className="hover:bg-orange-50/50 transition-colors group">
+                      <td className="py-4 text-xs font-bold text-orange-900">
+                        {new Date(entry.date).toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' })}
+                      </td>
+                      <td className="py-4 text-xs font-mono font-bold text-orange-600 text-right">
+                        {entry.amount.toLocaleString()} <span className="text-[10px] text-orange-300">THB</span>
+                      </td>
+                      <td className={cn(
+                        "py-4 text-xs font-bold text-right",
+                        entry.gainLossPct >= 0 ? "text-emerald-600" : "text-rose-600"
+                      )}>
+                        {entry.gainLossPct >= 0 ? '+' : ''}{entry.gainLossPct}%
+                      </td>
+                      <td className="py-4 text-right">
+                        <button 
+                          onClick={() => onDeleteHistory(entry.uId || (entry.date + entry.amount))}
+                          className="p-2 text-orange-200 hover:text-rose-500 transition-colors"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                  {historyData.length === 0 && (
+                    <tr>
+                      <td colSpan={3} className="py-12 text-center text-zinc-300 text-xs font-bold uppercase tracking-widest">
+                        {t.noHistory}
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
             </div>
           </div>
         </div>
@@ -974,6 +1082,193 @@ const MarketPulse = ({ t, lang }: { t: any, lang: string }) => {
 // --- Components ---
 
 // --- Components ---
+
+interface InvestmentCardProps {
+  inv: Investment;
+  t: any;
+  updateInvestment: (id: string, updates: any) => any;
+  recordInvestmentHistory: (id: string, amount: number) => any;
+  deleteInvestment: (id: string) => any;
+  setSelectedInvestment: (inv: Investment) => void;
+  accumulationReturn: number;
+}
+
+const InvestmentCard = ({ 
+  inv, 
+  t, 
+  updateInvestment, 
+  recordInvestmentHistory, 
+  deleteInvestment, 
+  setSelectedInvestment, 
+  accumulationReturn 
+}: any) => {
+  const [localName, setLocalName] = useState(inv.name);
+  const [localAmount, setLocalAmount] = useState(inv.amount);
+  const [localReturn, setLocalReturn] = useState(inv.expectedReturn ?? accumulationReturn);
+  const [isRecording, setIsRecording] = useState(false);
+
+  useEffect(() => {
+    setLocalName(inv.name);
+  }, [inv.name]);
+
+  useEffect(() => {
+    setLocalAmount(inv.amount);
+  }, [inv.amount]);
+
+  useEffect(() => {
+    setLocalReturn(inv.expectedReturn ?? accumulationReturn);
+  }, [inv.expectedReturn, accumulationReturn]);
+
+  const handleRecord = async () => {
+    setIsRecording(true);
+    await recordInvestmentHistory(inv.id, inv.amount);
+    setTimeout(() => setIsRecording(false), 2000);
+  };
+
+  return (
+    <motion.div 
+      layout
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, scale: 0.95 }}
+      className="p-4 bg-white border border-orange-100 rounded-2xl hover:border-orange-300 hover:shadow-xl hover:shadow-orange-500/5 transition-all group relative overflow-hidden"
+    >
+      {/* Category Accent Bar */}
+      <div className={cn(
+        "absolute top-0 left-0 w-1.5 h-full",
+        inv.category === 'Global Equity' ? "bg-orange-500" : "bg-emerald-500"
+      )} />
+
+      <div className="space-y-5">
+        <div className="flex justify-between items-start pl-2">
+          <div className="flex-1 min-w-0">
+            <input 
+              className="text-lg font-bold text-orange-900 bg-transparent border-none focus:ring-0 p-0 w-full truncate placeholder:text-orange-200 tracking-tight"
+              value={localName}
+              onChange={(e) => setLocalName(e.target.value)}
+              onBlur={() => updateInvestment(inv.id, { name: localName })}
+              placeholder={t.fundName}
+            />
+            <div className="flex items-center gap-2 mt-1">
+              <div className={cn(
+                "px-2 py-0.5 rounded-md text-[8px] font-bold uppercase tracking-widest",
+                inv.category === 'Global Equity' ? "bg-orange-100 text-orange-600" : "bg-emerald-100 text-emerald-600"
+              )}>
+                {inv.category === 'Global Equity' ? t.growthEngine : t.safetyNet}
+              </div>
+            </div>
+          </div>
+          <div className="flex items-center gap-1 shrink-0 bg-orange-50/50 p-1 rounded-xl">
+            <button 
+              onClick={() => setSelectedInvestment(inv)}
+              className="p-2 text-orange-400 hover:text-orange-600 hover:bg-white rounded-lg transition-all shadow-sm active:scale-90"
+              title={t.detailedAnalysis}
+            >
+              <Maximize2 className="w-4 h-4" />
+            </button>
+            <button 
+              onClick={handleRecord}
+              disabled={isRecording}
+              className={cn(
+                "p-2 rounded-lg transition-all shadow-sm active:scale-90",
+                isRecording ? "text-emerald-600 bg-emerald-50" : "text-emerald-400 hover:text-emerald-600 hover:bg-white"
+              )}
+              title={t.snapshot}
+            >
+              {isRecording ? <ShieldCheck className="w-4 h-4" /> : <Save className="w-4 h-4" />}
+            </button>
+            <button 
+              onClick={() => deleteInvestment(inv.id)}
+              className="p-2 text-orange-200 hover:text-rose-500 hover:bg-white rounded-lg transition-all shadow-sm active:scale-90"
+            >
+              <Trash2 className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+        
+        <div className="flex flex-col sm:flex-row items-start sm:items-end justify-between gap-6 pl-2">
+          <div className="w-full sm:flex-1">
+            <p className="text-[10px] font-bold text-orange-300 uppercase tracking-[0.2em] mb-2">{t.amount}</p>
+            <div className="relative group/input">
+              <input 
+                type="number"
+                className="w-full text-2xl font-mono font-bold text-orange-600 bg-transparent border-b-2 border-orange-50 focus:border-orange-200 focus:ring-0 p-0 pb-1 transition-all"
+                value={localAmount}
+                onChange={(e) => setLocalAmount(Number(e.target.value))}
+                onBlur={() => updateInvestment(inv.id, { amount: localAmount })}
+              />
+              <span className="absolute right-0 bottom-2 text-[10px] text-orange-300 font-bold uppercase tracking-widest">THB</span>
+            </div>
+          </div>
+          
+          {/* Mini History Chart - Clickable */}
+          <button 
+            onClick={() => setSelectedInvestment(inv)}
+            className="w-full sm:w-32 h-16 flex flex-col justify-end shrink-0 bg-orange-50/30 rounded-xl p-2 border border-orange-100/50 text-left hover:border-orange-300 hover:bg-orange-100/30 transition-all group/history"
+          >
+            <div className="h-10 relative">
+              {inv.history && inv.history.length > 0 ? (
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={inv.history}>
+                    <defs>
+                      <linearGradient id={`gradient-${inv.id}`} x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#fb923c" stopOpacity={0.2}/>
+                        <stop offset="95%" stopColor="#fb923c" stopOpacity={0}/>
+                      </linearGradient>
+                    </defs>
+                    <Line 
+                      type="monotone" 
+                      dataKey="amount" 
+                      stroke="#fb923c" 
+                      strokeWidth={2} 
+                      dot={inv.history.length === 1} 
+                      animationDuration={1500}
+                    />
+                  </LineChart>
+                </ResponsiveContainer>
+              ) : (
+                <div className="w-full h-full flex items-center justify-center border border-dashed border-orange-200 rounded-lg group-hover/history:border-orange-400">
+                  <span className="text-[10px] text-zinc-300 font-bold uppercase tracking-widest group-hover/history:text-orange-500 transition-colors">{t.noHistory}</span>
+                </div>
+              )}
+            </div>
+            <p className="text-[8px] text-orange-400 font-bold uppercase mt-1 text-center tracking-widest opacity-60 flex items-center justify-center gap-1 group-hover/history:opacity-100">
+              {t.history} <ArrowUpRight className="w-2 h-2" />
+            </p>
+          </button>
+        </div>
+
+        <div className="grid grid-cols-2 gap-3 pt-2 pl-2">
+          <div className="space-y-1.5">
+            <p className="text-[9px] font-bold text-orange-300 uppercase tracking-widest">Category</p>
+            <select 
+              className="w-full text-[10px] font-bold text-orange-600 bg-orange-50/50 border border-orange-100/50 rounded-xl px-3 py-2 focus:ring-2 focus:ring-orange-500/10 cursor-pointer hover:bg-orange-100/50 transition-all outline-none"
+              value={inv.category}
+              onChange={(e) => updateInvestment(inv.id, { category: e.target.value })}
+            >
+              <option value="Global Equity">📈 {t.growthEngine}</option>
+              <option value="Cash/Fixed Income">🛡️ {t.safetyNet}</option>
+            </select>
+          </div>
+          <div className="space-y-1.5">
+            <p className="text-[9px] font-bold text-emerald-400 uppercase tracking-widest">{t.expectedReturnShort}</p>
+            <div className="relative group/input">
+              <input 
+                type="number"
+                className="w-full text-[11px] font-mono font-bold text-emerald-600 bg-emerald-50/50 border border-emerald-100/50 rounded-xl px-3 py-2 focus:ring-2 focus:ring-emerald-500/10 transition-all outline-none"
+                value={localReturn}
+                onChange={(e) => setLocalReturn(Number(e.target.value))}
+                onBlur={() => updateInvestment(inv.id, { expectedReturn: localReturn })}
+                placeholder={t.expectedReturnShort}
+              />
+              <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] text-emerald-400 font-bold">%</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </motion.div>
+  );
+};
 
 const AssetAllocationChart = ({ investments, t }: { investments: Investment[], t: any }) => {
   const data = useMemo(() => {
@@ -1369,6 +1664,18 @@ export default function App() {
     return unsubscribe;
   }, [user]);
 
+  // --- Sync Selected Investment when list changes ---
+  useEffect(() => {
+    if (selectedInvestment) {
+      const fresh = investments.find(inv => inv.id === selectedInvestment.id);
+      if (fresh) {
+        setSelectedInvestment(fresh);
+      } else {
+        setSelectedInvestment(null);
+      }
+    }
+  }, [investments]);
+
   // --- Connection Test ---
   useEffect(() => {
     const testConnection = async () => {
@@ -1385,7 +1692,7 @@ export default function App() {
 
   // --- Auto-calculate Current Savings from Investments ---
   useEffect(() => {
-    if (user && investments.length > 0) {
+    if (user) {
       const total = investments.reduce((sum, inv) => sum + inv.amount, 0);
       setCurrentSavings(Math.round(total * 100) / 100);
     }
@@ -1443,22 +1750,63 @@ export default function App() {
       });
     } catch (e) {
       handleFirestoreError(e, OperationType.UPDATE, `users/${user.uid}/investments/${id}`);
+      throw e;
     }
   };
 
-  const recordInvestmentHistory = async (id: string, amount: number) => {
+  const recordInvestmentHistory = async (id: string, amount: number, customDate?: string) => {
     if (!user) return;
     const inv = investments.find(i => i.id === id);
     if (!inv) return;
 
-    const newHistory = [...(inv.history || []), { date: new Date().toISOString(), amount }];
+    // Use unique ID for entries to ensure safe deletion even with duplicate dates/amounts
+    const newEntry = { 
+      uId: Math.random().toString(36).substr(2, 9), 
+      date: customDate || new Date().toISOString(), 
+      amount 
+    };
+    
+    const newHistory = [...(inv.history || []), newEntry];
+    // Sort history by date
+    const sortedHistory = newHistory.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+    
+    // The latest history entry should reflect the current amount
+    const latestEntry = sortedHistory[sortedHistory.length - 1];
+
     try {
       await updateDoc(doc(db, 'users', user.uid, 'investments', id), {
-        history: newHistory,
+        history: sortedHistory,
+        amount: latestEntry.amount, // Sync current amount with the latest history entry
         updatedAt: new Date().toISOString()
       });
     } catch (e) {
       handleFirestoreError(e, OperationType.UPDATE, `users/${user.uid}/investments/${id}`);
+      throw e;
+    }
+  };
+
+  const deleteInvestmentHistoryEntry = async (investmentId: string, targetId: string) => {
+    if (!user) return;
+    const inv = investments.find(i => i.id === investmentId);
+    if (!inv || !inv.history) return;
+
+    // Filter out by unique ID or fallback to date+amount for legacy entries
+    const newHistory = inv.history.filter(h => (h.uId || (h.date + h.amount)) !== targetId);
+    
+    const sortedHistory = [...newHistory].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+    
+    // If we have history left, set amount to the latest entry
+    const latestAmount = sortedHistory.length > 0 ? sortedHistory[sortedHistory.length - 1].amount : inv.amount;
+
+    try {
+      await updateDoc(doc(db, 'users', user.uid, 'investments', investmentId), {
+        history: sortedHistory,
+        amount: latestAmount,
+        updatedAt: new Date().toISOString()
+      });
+    } catch (e) {
+      handleFirestoreError(e, OperationType.UPDATE, `users/${user.uid}/investments/${investmentId}`);
+      throw e;
     }
   };
 
@@ -2283,7 +2631,73 @@ export default function App() {
 
           {/* Right Column: Analysis */}
           <div className="lg:col-span-8 space-y-8">
-            
+            {/* Portfolio Section */}
+            {user && (
+              <Card title={t.portfolio} icon={Wallet} className="border-l-4 border-l-emerald-500 shadow-xl shadow-emerald-100/10">
+                <div className="space-y-6">
+                  <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center bg-emerald-50/50 p-6 rounded-2xl border border-emerald-100 gap-6">
+                    <div className="w-full sm:w-auto">
+                      <p className="text-[10px] font-bold text-emerald-600 uppercase tracking-widest mb-1">{t.totalPortfolio}</p>
+                      <p className="text-3xl font-bold font-mono text-emerald-900">
+                        {Math.round(currentSavings).toLocaleString()} 
+                        <span className="text-sm font-medium text-emerald-400 ml-2">{t.thb}</span>
+                      </p>
+                    </div>
+                    <div className="flex flex-col xs:flex-row gap-3 w-full sm:w-auto">
+                      <input 
+                        type="file" 
+                        ref={fileInputRef} 
+                        className="hidden" 
+                        accept="image/*"
+                        onChange={handleImageUpload}
+                      />
+                      <button 
+                        onClick={() => fileInputRef.current?.click()}
+                        disabled={isAnalyzing}
+                        className={cn(
+                          "flex-1 md:flex-none flex items-center justify-center gap-2 px-5 py-2.5 bg-white border border-emerald-200 text-emerald-600 text-xs font-bold rounded-xl hover:bg-emerald-50 transition-all shadow-sm active:scale-95",
+                          isAnalyzing && "opacity-50 cursor-not-allowed"
+                        )}
+                      >
+                        <Zap className={cn("w-4 h-4", isAnalyzing && "animate-spin")} />
+                        {isAnalyzing ? (lang === 'th' ? 'กำลังวิเคราะห์...' : 'Analyzing...') : t.quickImport}
+                      </button>
+                      <button 
+                        onClick={addInvestment}
+                        className="flex-1 md:flex-none flex items-center justify-center gap-2 px-5 py-2.5 bg-emerald-600 text-white text-xs font-bold rounded-xl hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-200 active:scale-95"
+                      >
+                        <Plus className="w-4 h-4" />
+                        {t.addInvestment}
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <AnimatePresence mode="popLayout">
+                      {investments.map((inv) => (
+                        <InvestmentCard 
+                          key={inv.id}
+                          inv={inv}
+                          t={t}
+                          updateInvestment={updateInvestment}
+                          recordInvestmentHistory={recordInvestmentHistory}
+                          deleteInvestment={deleteInvestment}
+                          setSelectedInvestment={setSelectedInvestment}
+                          accumulationReturn={accumulationReturn}
+                        />
+                      ))}
+                    </AnimatePresence>
+                    {investments.length === 0 && (
+                      <div className="col-span-full py-12 flex flex-col items-center justify-center border-2 border-dashed border-zinc-100 rounded-[2.5rem] bg-zinc-50/30">
+                        <Wallet className="w-10 h-10 text-zinc-200 mb-4" />
+                        <p className="text-zinc-400 text-xs font-bold uppercase tracking-widest">{t.addInvestment}</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </Card>
+            )}
+
             {/* Summary Dashboard */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
               {isSyncing && (
@@ -2455,57 +2869,57 @@ export default function App() {
                 </div>
               </Card>
 
-              <Card className="flex flex-col justify-center border-l-4 border-l-orange-600 hover:shadow-xl hover:-translate-y-1 transition-all duration-300 bg-white/50 min-h-[120px]">
-                <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-orange-400 mb-2">{t.targetCapital}</span>
-                <div>
-                  <span className="text-3xl font-bold font-mono tracking-tighter text-orange-900">
+              <Card className="flex flex-col justify-center border-l-4 border-l-orange-600 hover:shadow-xl hover:-translate-y-1 transition-all duration-300 bg-white/50 min-h-[140px] p-6 sm:p-8">
+                <span className="text-[10px] font-bold uppercase tracking-widest text-orange-400 mb-3">{t.targetCapital}</span>
+                <div className="flex flex-wrap items-baseline gap-x-2">
+                  <span className="text-2xl sm:text-3xl font-bold font-mono tracking-tighter text-orange-900">
                     {Math.round(results.targetCapital).toLocaleString()}
                   </span>
-                  <span className="ml-2 text-xs font-bold text-orange-300 uppercase">{t.thb}</span>
+                  <span className="text-xs font-bold text-orange-300 uppercase whitespace-nowrap">{t.thb}</span>
                 </div>
               </Card>
               
-              <Card className="flex flex-col justify-center hover:shadow-xl hover:-translate-y-1 transition-all duration-300 border-l-4 border-l-orange-400/50 bg-white/50 min-h-[120px]">
-                <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-orange-400 mb-2">{t.firstYearWithdrawal}</span>
-                <div>
-                  <span className="text-3xl font-bold font-mono tracking-tighter text-orange-900">
+              <Card className="flex flex-col justify-center hover:shadow-xl hover:-translate-y-1 transition-all duration-300 border-l-4 border-l-orange-400/50 bg-white/50 min-h-[140px] p-6 sm:p-8">
+                <span className="text-[10px] font-bold uppercase tracking-widest text-orange-400 mb-3">{t.firstYearWithdrawal}</span>
+                <div className="flex flex-wrap items-baseline gap-x-2">
+                  <span className="text-2xl sm:text-3xl font-bold font-mono tracking-tighter text-orange-900">
                     {Math.round(results.firstYearWithdrawal).toLocaleString()}
                   </span>
-                  <span className="ml-2 text-xs font-bold text-orange-300 uppercase">{t.thbYr}</span>
+                  <span className="text-xs font-bold text-orange-300 uppercase whitespace-nowrap">{t.thbYr}</span>
                 </div>
               </Card>
               
-              <Card className="flex flex-col justify-center hover:shadow-xl hover:-translate-y-1 transition-all duration-300 border-l-4 border-l-orange-400/50 bg-white/50 min-h-[120px]">
-                <div className="flex flex-col mb-2">
-                  <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-orange-400">
+              <Card className="flex flex-col justify-center hover:shadow-xl hover:-translate-y-1 transition-all duration-300 border-l-4 border-l-orange-400/50 bg-white/50 min-h-[140px] p-6 sm:p-8">
+                <div className="flex flex-col mb-3">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-orange-400">
                     {t.futureMonthlyIncome
                       .replace('{monthlyIncome}', monthlyIncome.toLocaleString())
                       .replace('{thb}', t.thb)
                     }
                   </span>
-                  <span className="text-[8px] text-orange-300 mt-1 leading-tight font-bold uppercase tracking-wider">
+                  <span className="text-[8px] text-orange-300 mt-1 leading-tight font-bold uppercase tracking-widest">
                     {t.futureMonthlyIncomeDesc
                       .replace('{retirementAge}', retirementAge.toString())
                     }
                   </span>
                 </div>
-                <div>
-                  <span className="text-3xl font-bold font-mono tracking-tighter text-orange-900">
+                <div className="flex flex-wrap items-baseline gap-x-2">
+                  <span className="text-2xl sm:text-3xl font-bold font-mono tracking-tighter text-orange-900">
                     {Math.round(results.futurePurchasingPower).toLocaleString()}
                   </span>
-                  <span className="ml-2 text-xs font-bold text-orange-300 uppercase">{t.thb}</span>
+                  <span className="text-xs font-bold text-orange-300 uppercase">{t.thb}</span>
                 </div>
               </Card>
               
-              <Card className="flex flex-col justify-center border-l-4 border-l-blue-500 bg-blue-50/50 hover:shadow-xl hover:-translate-y-1 transition-all duration-300 min-h-[120px]">
-                <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-blue-400 mb-2">{t.marketCondition}</span>
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-emerald-100 flex items-center justify-center">
-                    <TrendingUp className="w-6 h-6 text-emerald-600" />
+              <Card className="flex flex-col justify-center border-l-4 border-l-blue-500 bg-blue-50/50 hover:shadow-xl hover:-translate-y-1 transition-all duration-300 min-h-[140px] p-6 sm:p-8">
+                <span className="text-[10px] font-bold uppercase tracking-widest text-blue-400 mb-3">{t.marketCondition}</span>
+                <div className="flex items-center gap-4">
+                  <div className="w-12 h-12 rounded-2xl bg-emerald-100 flex items-center justify-center shrink-0 shadow-sm">
+                    <TrendingUp className="w-7 h-7 text-emerald-600" />
                   </div>
-                  <div>
-                    <span className="text-2xl font-bold text-blue-900 block leading-none">{t.bullMarket}</span>
-                    <span className="text-[9px] font-bold text-blue-400 uppercase tracking-[0.1em] mt-1 block">{t.marketPulse}</span>
+                  <div className="min-w-0">
+                    <span className="text-xl sm:text-2xl font-bold text-blue-900 block leading-tight truncate">{t.bullMarket}</span>
+                    <span className="text-[9px] font-bold text-blue-400 uppercase tracking-widest mt-1 block truncate">{t.marketPulse}</span>
                   </div>
                 </div>
               </Card>
@@ -2871,186 +3285,6 @@ export default function App() {
               </div>
             </div>
 
-            {/* Portfolio Section */}
-            {user && (
-              <Card title={t.portfolio} icon={Wallet} className="border-l-4 border-l-emerald-500">
-                <div className="space-y-6">
-                  <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center bg-emerald-50/50 p-6 rounded-2xl border border-emerald-100 gap-6">
-                    <div className="w-full sm:w-auto">
-                      <p className="text-[10px] font-bold text-emerald-600 uppercase tracking-widest mb-1">{t.totalPortfolio}</p>
-                      <p className="text-3xl font-bold font-mono text-emerald-900">
-                        {Math.round(currentSavings).toLocaleString()} 
-                        <span className="text-sm font-medium text-emerald-400 ml-2">{t.thb}</span>
-                      </p>
-                    </div>
-                    <div className="flex flex-col xs:flex-row gap-3 w-full sm:w-auto">
-                      <input 
-                        type="file" 
-                        ref={fileInputRef} 
-                        className="hidden" 
-                        accept="image/*"
-                        onChange={handleImageUpload}
-                      />
-                      <button 
-                        onClick={() => fileInputRef.current?.click()}
-                        disabled={isAnalyzing}
-                        className={cn(
-                          "flex-1 md:flex-none flex items-center justify-center gap-2 px-5 py-2.5 bg-white border border-emerald-200 text-emerald-600 text-xs font-bold rounded-xl hover:bg-emerald-50 transition-all shadow-sm active:scale-95",
-                          isAnalyzing && "opacity-50 cursor-not-allowed"
-                        )}
-                      >
-                        <Zap className={cn("w-4 h-4", isAnalyzing && "animate-spin")} />
-                        {isAnalyzing ? (lang === 'th' ? 'กำลังวิเคราะห์...' : 'Analyzing...') : t.quickImport}
-                      </button>
-                      <button 
-                        onClick={addInvestment}
-                        className="flex-1 md:flex-none flex items-center justify-center gap-2 px-5 py-2.5 bg-emerald-600 text-white text-xs font-bold rounded-xl hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-200 active:scale-95"
-                      >
-                        <Plus className="w-4 h-4" />
-                        {t.addInvestment}
-                      </button>
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <AnimatePresence mode="popLayout">
-                      {investments.map((inv) => (
-                        <motion.div 
-                          key={inv.id}
-                          layout
-                          initial={{ opacity: 0, y: 20 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          exit={{ opacity: 0, scale: 0.95 }}
-                          className="p-4 bg-white border border-orange-100 rounded-2xl hover:border-orange-300 hover:shadow-xl hover:shadow-orange-500/5 transition-all group relative overflow-hidden"
-                        >
-                          {/* Category Accent Bar */}
-                          <div className={cn(
-                            "absolute top-0 left-0 w-1.5 h-full",
-                            inv.category === 'Global Equity' ? "bg-orange-500" : "bg-emerald-500"
-                          )} />
-
-                          <div className="space-y-5">
-                            <div className="flex justify-between items-start pl-2">
-                              <div className="flex-1 min-w-0">
-                                <input 
-                                  className="text-lg font-bold text-orange-900 bg-transparent border-none focus:ring-0 p-0 w-full truncate placeholder:text-orange-200 tracking-tight"
-                                  value={inv.name}
-                                  onChange={(e) => updateInvestment(inv.id, { name: e.target.value })}
-                                  placeholder={t.fundName}
-                                />
-                                <div className="flex items-center gap-2 mt-1">
-                                  <div className={cn(
-                                    "px-2 py-0.5 rounded-md text-[8px] font-bold uppercase tracking-widest",
-                                    inv.category === 'Global Equity' ? "bg-orange-100 text-orange-600" : "bg-emerald-100 text-emerald-600"
-                                  )}>
-                                    {inv.category === 'Global Equity' ? t.growthEngine : t.safetyNet}
-                                  </div>
-                                </div>
-                              </div>
-                              <div className="flex items-center gap-1 shrink-0 bg-orange-50/50 p-1 rounded-xl">
-                                <button 
-                                  onClick={() => setSelectedInvestment(inv)}
-                                  className="p-2 text-orange-400 hover:text-orange-600 hover:bg-white rounded-lg transition-all shadow-sm active:scale-90"
-                                  title={t.detailedAnalysis}
-                                >
-                                  <Maximize2 className="w-4 h-4" />
-                                </button>
-                                <button 
-                                  onClick={() => recordInvestmentHistory(inv.id, inv.amount)}
-                                  className="p-2 text-emerald-400 hover:text-emerald-600 hover:bg-white rounded-lg transition-all shadow-sm active:scale-90"
-                                  title={t.snapshot}
-                                >
-                                  <Save className="w-4 h-4" />
-                                </button>
-                                <button 
-                                  onClick={() => deleteInvestment(inv.id)}
-                                  className="p-2 text-orange-200 hover:text-rose-500 hover:bg-white rounded-lg transition-all shadow-sm active:scale-90"
-                                >
-                                  <Trash2 className="w-4 h-4" />
-                                </button>
-                              </div>
-                            </div>
-                            
-                            <div className="flex flex-col sm:flex-row items-start sm:items-end justify-between gap-6 pl-2">
-                              <div className="w-full sm:flex-1">
-                                <p className="text-[10px] font-bold text-orange-300 uppercase tracking-[0.2em] mb-2">{t.amount}</p>
-                                <div className="relative group/input">
-                                  <input 
-                                    type="number"
-                                    className="w-full text-2xl font-mono font-bold text-orange-600 bg-transparent border-b-2 border-orange-50 focus:border-orange-200 focus:ring-0 p-0 pb-1 transition-all"
-                                    value={inv.amount}
-                                    onChange={(e) => updateInvestment(inv.id, { amount: Number(e.target.value) })}
-                                  />
-                                  <span className="absolute right-0 bottom-2 text-[10px] text-orange-300 font-bold uppercase tracking-widest">THB</span>
-                                </div>
-                              </div>
-                              
-                              {/* Mini History Chart */}
-                              <div className="w-full sm:w-32 h-16 flex flex-col justify-end shrink-0 bg-orange-50/30 rounded-xl p-2 border border-orange-100/50">
-                                <div className="h-10 relative">
-                                  {inv.history && inv.history.length > 1 ? (
-                                    <ResponsiveContainer width="100%" height="100%">
-                                      <LineChart data={inv.history}>
-                                        <defs>
-                                          <linearGradient id={`gradient-${inv.id}`} x1="0" y1="0" x2="0" y2="1">
-                                            <stop offset="5%" stopColor="#fb923c" stopOpacity={0.2}/>
-                                            <stop offset="95%" stopColor="#fb923c" stopOpacity={0}/>
-                                          </linearGradient>
-                                        </defs>
-                                        <Line 
-                                          type="monotone" 
-                                          dataKey="amount" 
-                                          stroke="#fb923c" 
-                                          strokeWidth={2} 
-                                          dot={false} 
-                                          animationDuration={1500}
-                                        />
-                                      </LineChart>
-                                    </ResponsiveContainer>
-                                  ) : (
-                                    <div className="w-full h-full flex items-center justify-center border border-dashed border-orange-200 rounded-lg">
-                                      <span className="text-[8px] text-orange-300 font-bold uppercase tracking-widest">{t.noHistory}</span>
-                                    </div>
-                                  )}
-                                </div>
-                                <p className="text-[8px] text-orange-400 font-bold uppercase mt-1 text-center tracking-widest opacity-60">{t.history}</p>
-                              </div>
-                            </div>
-
-                            <div className="grid grid-cols-2 gap-3 pt-2 pl-2">
-                              <div className="space-y-1.5">
-                                <p className="text-[9px] font-bold text-orange-300 uppercase tracking-widest">Category</p>
-                                <select 
-                                  className="w-full text-[10px] font-bold text-orange-600 bg-orange-50/50 border border-orange-100/50 rounded-xl px-3 py-2 focus:ring-2 focus:ring-orange-500/10 cursor-pointer hover:bg-orange-100/50 transition-all outline-none"
-                                  value={inv.category}
-                                  onChange={(e) => updateInvestment(inv.id, { category: e.target.value })}
-                                >
-                                  <option value="Global Equity">📈 {t.growthEngine}</option>
-                                  <option value="Cash/Fixed Income">🛡️ {t.safetyNet}</option>
-                                </select>
-                              </div>
-                              <div className="space-y-1.5">
-                                <p className="text-[9px] font-bold text-emerald-400 uppercase tracking-widest">{t.expectedReturnShort}</p>
-                                <div className="relative group/input">
-                                  <input 
-                                    type="number"
-                                    className="w-full text-[11px] font-mono font-bold text-emerald-600 bg-emerald-50/50 border border-emerald-100/50 rounded-xl px-3 py-2 focus:ring-2 focus:ring-emerald-500/10 transition-all outline-none"
-                                    value={inv.expectedReturn ?? accumulationReturn}
-                                    onChange={(e) => updateInvestment(inv.id, { expectedReturn: Number(e.target.value) })}
-                                    placeholder={t.expectedReturnShort}
-                                  />
-                                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] text-emerald-400 font-bold">%</span>
-                                </div>
-                              </div>
-                            </div>
-                          </div>
-                        </motion.div>
-                      ))}
-                    </AnimatePresence>
-                  </div>
-                </div>
-              </Card>
-            )}
 
             {/* Portfolio Blueprint */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
@@ -3328,7 +3562,13 @@ export default function App() {
           <DetailedInvestmentModal 
             investment={selectedInvestment} 
             onClose={() => setSelectedInvestment(null)} 
+            onAddHistory={(amount, date) => recordInvestmentHistory(selectedInvestment.id, amount, date)}
+            onDeleteHistory={async (uId) => {
+              await deleteInvestmentHistoryEntry(selectedInvestment.id, uId);
+              alert(lang === 'th' ? 'ลบรายการสำเร็จ!' : 'Deleted successfully!');
+            }}
             t={t}
+            lang={lang}
           />
         )}
       </AnimatePresence>
